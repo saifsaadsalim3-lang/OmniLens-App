@@ -2,6 +2,7 @@ package com.omnilens.omniguard
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -18,6 +19,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.FileProvider
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -78,14 +80,14 @@ class MainActivity : Activity() {
 
         // 3. نص حالة النظام
         statusTextView = TextView(this).apply {
-            text = "نظام التشفير والحماية جاهز ✅"
+            text = "نظام التشفير والتراخيص جاهز ✅"
             textSize = 15f
             setTextColor(Color.parseColor("#38BDF8"))
             gravity = Gravity.CENTER
             setPadding(0, 0, 0, 20)
         }
 
-        // 4. إطار عرض الصورة المختارة
+        // 4. إطار عرض الوسائط المختارة
         selectedImageView = ImageView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -127,7 +129,7 @@ class MainActivity : Activity() {
         buttonsLayout.addView(btnCamera, btnParams)
         buttonsLayout.addView(btnGallery, btnParams)
 
-        // 6. زر حفظ الصورة في الخزنة المحمية
+        // 6. زر الحفظ في الخزنة
         btnSave = Button(this).apply {
             text = "💾 حفظ في الخزنة المحمية"
             setBackgroundColor(Color.parseColor("#475569"))
@@ -142,7 +144,7 @@ class MainActivity : Activity() {
             }
         }
 
-        // 7. نص إخراج البصمة الرقمية والتشفير
+        // 7. نص البصمة الرقمية
         hashTextView = TextView(this).apply {
             text = "قم باختيار أو التقاط صورة لبدء استخراج البصمة الرقمية وتشفيرها."
             textSize = 13f
@@ -151,7 +153,7 @@ class MainActivity : Activity() {
             setPadding(15, 15, 15, 15)
         }
 
-        // 8. عنوان سجل الصور المحمية
+        // 8. عنوان سجل الخزنة
         val historyTitle = TextView(this).apply {
             text = "📜 سجل الصور المحمية (الخزنة)"
             textSize = 18f
@@ -179,7 +181,6 @@ class MainActivity : Activity() {
             setPadding(0, 30, 0, 10)
         }
 
-        // إضافة جميع العناصر للواجهة
         rootLayout.addView(logoImage)
         rootLayout.addView(titleText)
         rootLayout.addView(statusTextView)
@@ -194,7 +195,6 @@ class MainActivity : Activity() {
         scrollView.addView(rootLayout)
         setContentView(scrollView)
 
-        // تحميل السجل القديم عند التشغيل
         loadSavedVaultHistory()
     }
 
@@ -285,7 +285,7 @@ class MainActivity : Activity() {
 
             Toast.makeText(this, "تم حفظ الصورة في الخزنة بنجاح 🛡️", Toast.LENGTH_SHORT).show()
 
-            addCardToHistory(bitmap, fileName, currentHash, timeStamp)
+            addCardToHistory(bitmap, imageFile, currentHash, timeStamp)
 
             btnSave.isEnabled = false
             btnSave.setBackgroundColor(Color.parseColor("#475569"))
@@ -296,7 +296,7 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun addCardToHistory(bitmap: Bitmap, fileName: String, hash: String, timeStamp: String) {
+    private fun addCardToHistory(bitmap: Bitmap, file: File, hash: String, timeStamp: String) {
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(Color.parseColor("#1E293B"))
@@ -311,7 +311,7 @@ class MainActivity : Activity() {
 
         val thumbView = ImageView(this).apply {
             setImageBitmap(bitmap)
-            layoutParams = LinearLayout.LayoutParams(130, 130).apply {
+            layoutParams = LinearLayout.LayoutParams(120, 120).apply {
                 gravity = Gravity.CENTER_VERTICAL
             }
             scaleType = ImageView.ScaleType.CENTER_CROP
@@ -319,14 +319,14 @@ class MainActivity : Activity() {
 
         val infoLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(20, 0, 0, 0)
+            setPadding(20, 0, 10, 0)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
         val fileText = TextView(this).apply {
-            text = fileName
+            text = file.name
             setTextColor(Color.WHITE)
-            textSize = 14f
+            textSize = 13f
             setTypeface(null, Typeface.BOLD)
         }
 
@@ -337,7 +337,7 @@ class MainActivity : Activity() {
         }
 
         val hashShortText = TextView(this).apply {
-            text = "البصمة: ${hash.take(16)}..."
+            text = "البصمة: ${hash.take(14)}..."
             setTextColor(Color.parseColor("#94A3B8"))
             textSize = 10f
         }
@@ -346,10 +346,76 @@ class MainActivity : Activity() {
         infoLayout.addView(dateText)
         infoLayout.addView(hashShortText)
 
+        // زر المشاركة والتصنيف
+        val btnShare = Button(this).apply {
+            text = "📤"
+            textSize = 16f
+            setBackgroundColor(Color.parseColor("#2563EB"))
+            setTextColor(Color.WHITE)
+            layoutParams = LinearLayout.LayoutParams(110, 110).apply {
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            setOnClickListener {
+                showShareTypeDialog(file, hash)
+            }
+        }
+
         card.addView(thumbView)
         card.addView(infoLayout)
+        card.addView(btnShare)
 
         historyLayout.addView(card, 0)
+    }
+
+    private fun showShareTypeDialog(file: File, hash: String) {
+        val options = arrayOf("🆓 مشاركة مجانية (Free)", "🎁 مشاركة كهدية مميزة (Gift)", "💰 مشاركة كترخيص مدفوع (Paid)")
+
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("اختر نوع الترخيص والمشاركة:")
+        builder.setItems(options) { _, which ->
+            when (which) {
+                0 -> executeShare(file, hash, "🆓 ترخيص مجاني (عرض عام)", "المحتوى متاح للمعاينة والتداول المجاني.")
+                1 -> executeShare(file, hash, "🎁 ترخيص هدية مميزة (VIP)", "هذا المحتوى مرسل كهدية خاصة وموثقة بالبصمة.")
+                2 -> executeShare(file, hash, "💰 ترخيص محتوى مدفوع (Commercial)", "⚠️ محتوى تجاري مشفر. يُشترط الحصول على مفتاح الفك للاستخدام القانوني.")
+            }
+        }
+        builder.show()
+    }
+
+    private fun executeShare(file: File, hash: String, licenseTitle: String, licenseDesc: String) {
+        try {
+            val uri: Uri = FileProvider.getUriForFile(
+                this,
+                "$packageName.provider",
+                file
+            )
+
+            val mimeType = if (file.name.endsWith(".mp4", ignoreCase = true)) "video/*" else "image/*"
+
+            val shareMessage = """
+                🔒 منصة OmniLens للحماية وتوثيق الوسائط
+                ----------------------------------------
+                📌 نوع الترخيص: $licenseTitle
+                📝 الوصف: $licenseDesc
+                
+                🔑 بصمة الملكية الرقمية (SHA-256):
+                $hash
+                ----------------------------------------
+                © جميع الحقوق محفوظة لمنصة OmniLens وللمستخدم.
+            """.trimIndent()
+
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = mimeType
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, "وسائط محمية - $licenseTitle")
+                putExtra(Intent.EXTRA_TEXT, shareMessage)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+
+            startActivity(Intent.createChooser(shareIntent, "مشاركة الوسائط عبر:"))
+        } catch (e: Exception) {
+            Toast.makeText(this, "تعذرت المشاركة: ${e.message}", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun loadSavedVaultHistory() {
@@ -366,7 +432,7 @@ class MainActivity : Activity() {
                     val hash = hashBytes.joinToString("") { "%02x".format(it) }
 
                     val date = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date(file.lastModified()))
-                    addCardToHistory(bitmap, file.name, hash, date)
+                    addCardToHistory(bitmap, file, hash, date)
                 }
             }
         }
