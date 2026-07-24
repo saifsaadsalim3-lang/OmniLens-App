@@ -25,5 +25,5 @@ android {
 }
 
 dependencies {
-    // تم تفريغ التبعيات الخارجية مؤقتاً لضمان بناء حزمة APK مئة بالمئة
+    implementation("androidx.appcompat:appcompat:1.6.1")
 }
