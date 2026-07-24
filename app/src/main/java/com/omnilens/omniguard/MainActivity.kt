@@ -386,7 +386,7 @@ class MainActivity : Activity() {
         try {
             val uri: Uri = FileProvider.getUriForFile(
                 this,
-                "$packageName.provider",
+                "com.omnilens.omniguard.provider",
                 file
             )
 
