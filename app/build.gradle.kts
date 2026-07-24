@@ -11,10 +11,18 @@ android {
         applicationId = "com.omnilens.omniguard"
         minSdk = 24
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.2.0"
+        versionCode = 4
+        versionName = "1.3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    // تخصيص اسم ملف الـ APK الناتج ليكون باسم التطبيق ورقم الإصدار
+    applicationVariants.all {
+        outputs.all {
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            output.outputFileName = "OmniLens-v${versionName}.apk"
+        }
     }
 
     buildTypes {
@@ -38,7 +46,6 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     
-    // مكتبات CameraX المتقدمة للكاميرا والفيديو والدقة
     val cameraVersion = "1.3.4"
     implementation("androidx.camera:camera-core:$cameraVersion")
     implementation("androidx.camera:camera-camera2:$cameraVersion")
