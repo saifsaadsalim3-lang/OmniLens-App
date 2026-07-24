@@ -9,8 +9,10 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
 import android.provider.MediaStore
 import android.view.Gravity
 import android.widget.Button
@@ -20,7 +22,6 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.FileProvider
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -46,7 +47,6 @@ class MainActivity : Activity() {
     // إعدادات الكاميرا المختارة
     private var selectedResolution = "FHD (1080p)"
     private var selectedFPS = "30 FPS"
-    private var selectedMediaType = "صورة 📷"
 
     private val CAMERA_REQUEST_CODE = 101
     private val GALLERY_REQUEST_CODE = 102
@@ -173,13 +173,13 @@ class MainActivity : Activity() {
         buttonsLayout.addView(btnVideo, btnParams)
         buttonsLayout.addView(btnGallery, btnParams)
 
-        // 8. زر الحفظ في الخزنة
+        // 8. زر الحفظ في الخزنة والاستوديو
         btnSave = Button(this).apply {
-            text = "💾 حفظ في الخزنة المحمية"
+            text = "💾 حفظ في خزنة OmniLens واستوديو الجهاز"
             setBackgroundColor(Color.parseColor("#475569"))
             setTextColor(Color.WHITE)
             isEnabled = false
-            setOnClickListener { saveEncryptedMediaToVault() }
+            setOnClickListener { saveEncryptedMediaToVaultAndGallery() }
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -190,7 +190,7 @@ class MainActivity : Activity() {
 
         // 9. نص البصمة الرقمية
         hashTextView = TextView(this).apply {
-            text = "اختر دقة الكاميرا وابدأ بالتقاط صورة أو فيديو لاستخراج البصمة الرقمية وتشفيرها."
+            text = "التقط صورة/فيديو لتشفيرها، استعراضها مشغلات جهازك، وحفظها مباشرة بالاستوديو."
             textSize = 13f
             setTextColor(Color.parseColor("#94A3B8"))
             gravity = Gravity.CENTER
@@ -199,8 +199,8 @@ class MainActivity : Activity() {
 
         // 10. عنوان سجل الخزنة
         val historyTitle = TextView(this).apply {
-            text = "📜 سجل الوسائط المحمية (الخزنة)"
-            textSize = 18f
+            text = "📜 سجل وسائط OmniLens (اضغط للعرض/التشغيل)"
+            textSize = 17f
             setTypeface(null, Typeface.BOLD)
             setTextColor(Color.parseColor("#F8FAFC"))
             setPadding(0, 25, 0, 15)
@@ -264,7 +264,7 @@ class MainActivity : Activity() {
                     4 -> selectedFPS = "60 FPS"
                 }
                 settingsSummaryText.text = "⚙️ الإعدادات الحالية: الدقة [$selectedResolution] | الإطارات [$selectedFPS]"
-                Toast.makeText(this, "تم اعتماد الإعدادات: $selectedResolution - $selectedFPS", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "تم اعتمد الإعدادات: $selectedResolution - $selectedFPS", Toast.LENGTH_SHORT).show()
             }
             .show()
     }
@@ -309,7 +309,7 @@ class MainActivity : Activity() {
     private fun openVideoCamera() {
         try {
             val videoIntent = Intent(MediaStore.ACTION_VIDEO_CAPTURE).apply {
-                putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1) // 1 تعني أقصى جودة المتاحة للجهاز
+                putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1)
             }
             startActivityForResult(videoIntent, VIDEO_REQUEST_CODE)
         } catch (e: Exception) {
@@ -394,7 +394,7 @@ class MainActivity : Activity() {
             statusTextView.text = "تم تشفير الـ ($typeName) بدقة [$selectedResolution] 🔒✅"
             statusTextView.setTextColor(Color.parseColor("#4ADE80"))
 
-            hashTextView.text = "بصمة الملكية الرقمية (SHA-256):\n$currentHash\n\n[إعدادات التشفير: $selectedResolution | $selectedFPS]"
+            hashTextView.text = "بصمة الملكية الرقمية (SHA-256):\n$currentHash\n\n[جاهز للحفظ بـ DCIM/OmniLens ومعرض الجهاز]"
             hashTextView.setTextColor(Color.parseColor("#E2E8F0"))
 
             btnSave.isEnabled = true
@@ -404,36 +404,50 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun saveEncryptedMediaToVault() {
+    // 1. الحفظ في مسار الكاميرا المستقل (DCIM/OmniLens) وإظهاره في استوديو الجهاز
+    private fun saveEncryptedMediaToVaultAndGallery() {
         val mediaFile = currentMediaFile ?: return
         if (currentHash.isEmpty()) return
 
         try {
             val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val ext = if (mediaFile.name.endsWith(".mp4", ignoreCase = true)) ".mp4" else ".png"
+            val isVideo = mediaFile.name.endsWith(".mp4", ignoreCase = true)
+            val ext = if (isVideo) ".mp4" else ".png"
             val fileName = "OMNI_$timeStamp$ext"
 
-            val vaultDir = File(filesDir, "OmniVault")
-            if (!vaultDir.exists()) {
-                vaultDir.mkdirs()
+            // الحفظ في مجلد الكاميرا العام الاستوديو: DCIM/OmniLens
+            val dcimDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM)
+            val omniFolder = File(dcimDir, "OmniLens")
+            if (!omniFolder.exists()) {
+                omniFolder.mkdirs()
             }
 
-            val destFile = File(vaultDir, fileName)
+            val destFile = File(omniFolder, fileName)
             mediaFile.copyTo(destFile, overwrite = true)
 
-            Toast.makeText(this, "تم الحفظ في الخزنة المحمية بنجاح 🛡️", Toast.LENGTH_SHORT).show()
+            // إجراء مسح ضوئي لكي يظهر الملف فوراً في الاستوديو والـ Gallery
+            val mimeType = if (isVideo) "video/mp4" else "image/png"
+            MediaScannerConnection.scanFile(
+                this,
+                arrayOf(destFile.absolutePath),
+                arrayOf(mimeType),
+                null
+            )
+
+            Toast.makeText(this, "تم الحفظ بـ DCIM/OmniLens ومزامنة الاستوديو 🛡️", Toast.LENGTH_SHORT).show()
 
             addCardToHistory(currentBitmap, destFile, currentHash, timeStamp)
 
             btnSave.isEnabled = false
             btnSave.setBackgroundColor(Color.parseColor("#475569"))
-            statusTextView.text = "تم الحفظ في الخزنة المحمية 📦✅"
+            statusTextView.text = "تم الحفظ في الاستوديو وخزنة OmniLens 📦✅"
 
         } catch (e: Exception) {
             Toast.makeText(this, "خطأ في الحفظ: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
+    // 2. إضافة الملف للسجل مع إمكانية التشغيل التفاعلي بمشغلات الجهاز
     private fun addCardToHistory(bitmap: Bitmap?, file: File, hash: String, timeStamp: String) {
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -488,6 +502,25 @@ class MainActivity : Activity() {
         infoLayout.addView(dateText)
         infoLayout.addView(hashShortText)
 
+        // دالة تشغيل / فتح الوسائط بمشغلات الجهاز المتاحة
+        val openWithDevicePlayer = {
+            try {
+                val uri = FileProvider.getUriForFile(this, "com.omnilens.omniguard.provider", file)
+                val mimeType = if (file.name.endsWith(".mp4", ignoreCase = true)) "video/*" else "image/*"
+                val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, mimeType)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                startActivity(Intent.createChooser(viewIntent, "استعراض/تشغيل بواسطة:"))
+            } catch (e: Exception) {
+                Toast.makeText(this, "تعذر التشغيل: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // إمكانية الضغط على الصورة أو الكارت لفتح واستعراض الملف
+        thumbView.setOnClickListener { openWithDevicePlayer() }
+        infoLayout.setOnClickListener { openWithDevicePlayer() }
+
         val btnShare = Button(this).apply {
             text = "📤"
             textSize = 16f
@@ -539,7 +572,7 @@ class MainActivity : Activity() {
                 ----------------------------------------
                 📌 نوع الترخيص: $licenseTitle
                 📝 الوصف: $licenseDesc
-                🎥 إعدادات الملف: [$selectedResolution | $selectedFPS]
+                🎥 الجودة: [$selectedResolution | $selectedFPS]
                 
                 🔑 بصمة الملكية الرقمية (SHA-256):
                 $hash
@@ -562,9 +595,11 @@ class MainActivity : Activity() {
     }
 
     private fun loadSavedVaultHistory() {
-        val vaultDir = File(filesDir, "OmniVault")
-        if (vaultDir.exists()) {
-            val files = vaultDir.listFiles()?.sortedByDescending { it.lastModified() }
+        val dcimDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM)
+        val omniFolder = File(dcimDir, "OmniLens")
+
+        if (omniFolder.exists()) {
+            val files = omniFolder.listFiles()?.sortedByDescending { it.lastModified() }
             files?.forEach { file ->
                 val isVideo = file.name.endsWith(".mp4", ignoreCase = true)
                 val bitmap = if (!isVideo) BitmapFactory.decodeFile(file.absolutePath) else null
@@ -578,7 +613,7 @@ class MainActivity : Activity() {
                     val date = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date(file.lastModified()))
                     addCardToHistory(bitmap, file, hash, date)
                 } catch (e: Exception) {
-                    // تجاهل الأخطاء البسيطة عند التحميل
+                    // تجاهل أي ملفات تالفة عند التحميل
                 }
             }
         }
