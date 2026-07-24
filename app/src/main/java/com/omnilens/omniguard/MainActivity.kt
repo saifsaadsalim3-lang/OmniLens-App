@@ -1,7 +1,9 @@
 package com.omnilens.omniguard
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Typeface
@@ -25,6 +27,7 @@ class MainActivity : Activity() {
 
     private val CAMERA_REQUEST_CODE = 101
     private val GALLERY_REQUEST_CODE = 102
+    private val CAMERA_PERMISSION_CODE = 103
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -94,8 +97,7 @@ class MainActivity : Activity() {
             setBackgroundColor(Color.parseColor("#2563EB"))
             setTextColor(Color.WHITE)
             setOnClickListener {
-                val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-                startActivityForResult(cameraIntent, CAMERA_REQUEST_CODE)
+                checkAndOpenCamera()
             }
         }
 
@@ -145,6 +147,31 @@ class MainActivity : Activity() {
 
         scrollView.addView(rootLayout)
         setContentView(scrollView)
+    }
+
+    private fun checkAndOpenCamera() {
+        if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            openCamera()
+        } else {
+            requestPermissions(arrayOf(Manifest.permission.CAMERA), CAMERA_PERMISSION_CODE)
+        }
+    }
+
+    private fun openCamera() {
+        val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+        startActivityForResult(cameraIntent, CAMERA_REQUEST_CODE)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == CAMERA_PERMISSION_CODE) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                openCamera()
+            } else {
+                statusTextView.text = "تم رفض صلاحية الكاميرا ❌"
+                statusTextView.setTextColor(Color.parseColor("#EF4444"))
+            }
+        }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
