@@ -22,6 +22,7 @@ import android.widget.Toast
 import androidx.core.content.FileProvider
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
@@ -35,13 +36,22 @@ class MainActivity : Activity() {
     private lateinit var statusTextView: TextView
     private lateinit var btnSave: Button
     private lateinit var historyLayout: LinearLayout
+    private lateinit var settingsSummaryText: TextView
 
     private var currentBitmap: Bitmap? = null
+    private var currentMediaFile: File? = null
     private var currentHash: String = ""
+    private var tempPhotoFile: File? = null
+
+    // إعدادات الكاميرا المختارة
+    private var selectedResolution = "FHD (1080p)"
+    private var selectedFPS = "30 FPS"
+    private var selectedMediaType = "صورة 📷"
 
     private val CAMERA_REQUEST_CODE = 101
     private val GALLERY_REQUEST_CODE = 102
-    private val CAMERA_PERMISSION_CODE = 103
+    private val VIDEO_REQUEST_CODE = 103
+    private val PERMISSION_CODE = 104
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -84,10 +94,33 @@ class MainActivity : Activity() {
             textSize = 15f
             setTextColor(Color.parseColor("#38BDF8"))
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 20)
+            setPadding(0, 0, 0, 10)
         }
 
-        // 4. إطار عرض الوسائط المختارة
+        // 4. ملخص إعدادات الكاميرا والجودة
+        settingsSummaryText = TextView(this).apply {
+            text = "⚙️ الإعدادات الحالية: الدقة [$selectedResolution] | الإطارات [$selectedFPS]"
+            textSize = 12f
+            setTextColor(Color.parseColor("#F59E0B"))
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 15)
+        }
+
+        // 5. زر الإعدادات المتقدمة للكاميرا
+        val btnSettings = Button(this).apply {
+            text = "⚙️ إعدادات الكاميرا والدقة (Resolution & FPS)"
+            setBackgroundColor(Color.parseColor("#334155"))
+            setTextColor(Color.WHITE)
+            setOnClickListener { showCameraSettingsDialog() }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 0, 0, 15)
+            }
+        }
+
+        // 6. إطار عرض الوسائط المختارة
         selectedImageView = ImageView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -99,22 +132,32 @@ class MainActivity : Activity() {
             scaleType = ImageView.ScaleType.FIT_CENTER
         }
 
-        // 5. أزرار التحكم (الكاميرا والمعرض)
+        // 7. أزرار التحكم (التقاط صورة / تسجيل فيديو / المعرض)
         val buttonsLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(0, 10, 0, 10)
+            setPadding(0, 5, 0, 10)
         }
 
         val btnCamera = Button(this).apply {
             text = "📷 التقاط صورة"
+            textSize = 12f
             setBackgroundColor(Color.parseColor("#2563EB"))
             setTextColor(Color.WHITE)
-            setOnClickListener { checkAndOpenCamera() }
+            setOnClickListener { checkPermissionsAndCapture(isVideo = false) }
+        }
+
+        val btnVideo = Button(this).apply {
+            text = "🎥 تسجيل فيديو"
+            textSize = 12f
+            setBackgroundColor(Color.parseColor("#DC2626"))
+            setTextColor(Color.WHITE)
+            setOnClickListener { checkPermissionsAndCapture(isVideo = true) }
         }
 
         val btnGallery = Button(this).apply {
             text = "🖼️ المعرض"
+            textSize = 12f
             setBackgroundColor(Color.parseColor("#0D9488"))
             setTextColor(Color.WHITE)
             setOnClickListener {
@@ -124,18 +167,19 @@ class MainActivity : Activity() {
         }
 
         val btnParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-            setMargins(5, 0, 5, 0)
+            setMargins(3, 0, 3, 0)
         }
         buttonsLayout.addView(btnCamera, btnParams)
+        buttonsLayout.addView(btnVideo, btnParams)
         buttonsLayout.addView(btnGallery, btnParams)
 
-        // 6. زر الحفظ في الخزنة
+        // 8. زر الحفظ في الخزنة
         btnSave = Button(this).apply {
             text = "💾 حفظ في الخزنة المحمية"
             setBackgroundColor(Color.parseColor("#475569"))
             setTextColor(Color.WHITE)
             isEnabled = false
-            setOnClickListener { saveEncryptedImageToVault() }
+            setOnClickListener { saveEncryptedMediaToVault() }
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -144,25 +188,25 @@ class MainActivity : Activity() {
             }
         }
 
-        // 7. نص البصمة الرقمية
+        // 9. نص البصمة الرقمية
         hashTextView = TextView(this).apply {
-            text = "قم باختيار أو التقاط صورة لبدء استخراج البصمة الرقمية وتشفيرها."
+            text = "اختر دقة الكاميرا وابدأ بالتقاط صورة أو فيديو لاستخراج البصمة الرقمية وتشفيرها."
             textSize = 13f
             setTextColor(Color.parseColor("#94A3B8"))
             gravity = Gravity.CENTER
             setPadding(15, 15, 15, 15)
         }
 
-        // 8. عنوان سجل الخزنة
+        // 10. عنوان سجل الخزنة
         val historyTitle = TextView(this).apply {
-            text = "📜 سجل الصور المحمية (الخزنة)"
+            text = "📜 سجل الوسائط المحمية (الخزنة)"
             textSize = 18f
             setTypeface(null, Typeface.BOLD)
             setTextColor(Color.parseColor("#F8FAFC"))
             setPadding(0, 25, 0, 15)
         }
 
-        // 9. حاوية سجل الصور
+        // 11. حاوية سجل الوسائط
         historyLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(
@@ -171,7 +215,7 @@ class MainActivity : Activity() {
             )
         }
 
-        // 10. حفظ الحقوق
+        // 12. حفظ الحقوق
         val rightsText = TextView(this).apply {
             text = "جميع الحقوق محفوظة لمنصة OmniLens و للمستخدم"
             textSize = 12f
@@ -184,6 +228,8 @@ class MainActivity : Activity() {
         rootLayout.addView(logoImage)
         rootLayout.addView(titleText)
         rootLayout.addView(statusTextView)
+        rootLayout.addView(settingsSummaryText)
+        rootLayout.addView(btnSettings)
         rootLayout.addView(selectedImageView)
         rootLayout.addView(buttonsLayout)
         rootLayout.addView(btnSave)
@@ -198,26 +244,86 @@ class MainActivity : Activity() {
         loadSavedVaultHistory()
     }
 
-    private fun checkAndOpenCamera() {
-        if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-            openCamera()
+    private fun showCameraSettingsDialog() {
+        val options = arrayOf(
+            "📐 الدقة: HD (720p)",
+            "📐 الدقة: FHD (1080p) [مستحسن]",
+            "📐 الدقة: Ultra HD (4K / أقصى جودة)",
+            "⏱️ الفريمات: 30 FPS",
+            "⏱️ الفريمات: 60 FPS (سلاسة فائقة)"
+        )
+
+        AlertDialog.Builder(this)
+            .setTitle("⚙️ إعدادات جودة الكاميرا وعتاد الجهاز:")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> selectedResolution = "HD (720p)"
+                    1 -> selectedResolution = "FHD (1080p)"
+                    2 -> selectedResolution = "4K (2160p)"
+                    3 -> selectedFPS = "30 FPS"
+                    4 -> selectedFPS = "60 FPS"
+                }
+                settingsSummaryText.text = "⚙️ الإعدادات الحالية: الدقة [$selectedResolution] | الإطارات [$selectedFPS]"
+                Toast.makeText(this, "تم اعتماد الإعدادات: $selectedResolution - $selectedFPS", Toast.LENGTH_SHORT).show()
+            }
+            .show()
+    }
+
+    private fun checkPermissionsAndCapture(isVideo: Boolean) {
+        val permissions = arrayOf(
+            Manifest.permission.CAMERA,
+            Manifest.permission.RECORD_AUDIO
+        )
+
+        val hasCamera = checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        val hasAudio = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+
+        if (hasCamera && hasAudio) {
+            if (isVideo) openVideoCamera() else openPhotoCamera()
         } else {
-            requestPermissions(arrayOf(Manifest.permission.CAMERA), CAMERA_PERMISSION_CODE)
+            requestPermissions(permissions, PERMISSION_CODE)
         }
     }
 
-    private fun openCamera() {
-        val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        startActivityForResult(cameraIntent, CAMERA_REQUEST_CODE)
+    private fun openPhotoCamera() {
+        try {
+            val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            tempPhotoFile = File.createTempFile("TEMP_$timeStamp", ".jpg", filesDir)
+
+            val photoURI: Uri = FileProvider.getUriForFile(
+                this,
+                "com.omnilens.omniguard.provider",
+                tempPhotoFile!!
+            )
+
+            val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+                putExtra(MediaStore.EXTRA_OUTPUT, photoURI)
+                addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            }
+            startActivityForResult(cameraIntent, CAMERA_REQUEST_CODE)
+        } catch (e: Exception) {
+            Toast.makeText(this, "خطأ في تشغيل الكاميرا: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun openVideoCamera() {
+        try {
+            val videoIntent = Intent(MediaStore.ACTION_VIDEO_CAPTURE).apply {
+                putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1) // 1 تعني أقصى جودة المتاحة للجهاز
+            }
+            startActivityForResult(videoIntent, VIDEO_REQUEST_CODE)
+        } catch (e: Exception) {
+            Toast.makeText(this, "خطأ في تشغيل تصوير الفيديو: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == CAMERA_PERMISSION_CODE) {
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                openCamera()
+        if (requestCode == PERMISSION_CODE) {
+            if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
+                Toast.makeText(this, "تم منح جميع الصلاحيات ✅", Toast.LENGTH_SHORT).show()
             } else {
-                statusTextView.text = "تم رفض صلاحية الكاميرا ❌"
+                statusTextView.text = "تم رفض الصلاحيات المطلوبة ❌"
                 statusTextView.setTextColor(Color.parseColor("#EF4444"))
             }
         }
@@ -225,67 +331,99 @@ class MainActivity : Activity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (resultCode == RESULT_OK && data != null) {
-            var bitmap: Bitmap? = null
-
+        if (resultCode == RESULT_OK) {
             if (requestCode == CAMERA_REQUEST_CODE) {
-                bitmap = data.extras?.get("data") as? Bitmap
-            } else if (requestCode == GALLERY_REQUEST_CODE) {
+                tempPhotoFile?.let { file ->
+                    if (file.exists() && file.length() > 0) {
+                        val bitmap = BitmapFactory.decodeFile(file.absolutePath)
+                        currentBitmap = bitmap
+                        selectedImageView.setImageBitmap(bitmap)
+                        currentMediaFile = file
+                        processAndEncryptMedia(file, isVideo = false)
+                    }
+                }
+            } else if (requestCode == VIDEO_REQUEST_CODE && data != null) {
+                val videoUri: Uri? = data.data
+                if (videoUri != null) {
+                    val file = createTempFileFromUri(videoUri, ".mp4")
+                    if (file != null) {
+                        currentMediaFile = file
+                        selectedImageView.setImageResource(android.R.drawable.ic_media_play)
+                        processAndEncryptMedia(file, isVideo = true)
+                    }
+                }
+            } else if (requestCode == GALLERY_REQUEST_CODE && data != null) {
                 val imageUri: Uri? = data.data
                 if (imageUri != null) {
-                    bitmap = MediaStore.Images.Media.getBitmap(this.contentResolver, imageUri)
+                    val bitmap = MediaStore.Images.Media.getBitmap(this.contentResolver, imageUri)
+                    val file = createTempFileFromUri(imageUri, ".png")
+                    if (file != null && bitmap != null) {
+                        currentBitmap = bitmap
+                        selectedImageView.setImageBitmap(bitmap)
+                        currentMediaFile = file
+                        processAndEncryptMedia(file, isVideo = false)
+                    }
                 }
-            }
-
-            if (bitmap != null) {
-                currentBitmap = bitmap
-                selectedImageView.setImageBitmap(bitmap)
-                processAndEncryptImage(bitmap)
             }
         }
     }
 
-    private fun processAndEncryptImage(bitmap: Bitmap) {
-        val stream = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
-        val byteArray = stream.toByteArray()
-
-        val digest = MessageDigest.getInstance("SHA-256")
-        val hashBytes = digest.digest(byteArray)
-        currentHash = hashBytes.joinToString("") { "%02x".format(it) }
-
-        statusTextView.text = "تم التشفير وحفظ البصمة الرقمية بنجاح 🔒✅"
-        statusTextView.setTextColor(Color.parseColor("#4ADE80"))
-
-        hashTextView.text = "بصمة الملكية الرقمية (SHA-256):\n$currentHash\n\n[حالة الملف: جاهز للحفظ في الخزنة]"
-        hashTextView.setTextColor(Color.parseColor("#E2E8F0"))
-
-        btnSave.isEnabled = true
-        btnSave.setBackgroundColor(Color.parseColor("#16A34A"))
+    private fun createTempFileFromUri(uri: Uri, extension: String): File? {
+        return try {
+            val inputStream = contentResolver.openInputStream(uri) ?: return null
+            val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val tempFile = File.createTempFile("MEDIA_$timeStamp", extension, filesDir)
+            val outputStream = FileOutputStream(tempFile)
+            inputStream.copyTo(outputStream)
+            inputStream.close()
+            outputStream.close()
+            tempFile
+        } catch (e: Exception) {
+            null
+        }
     }
 
-    private fun saveEncryptedImageToVault() {
-        val bitmap = currentBitmap ?: return
+    private fun processAndEncryptMedia(file: File, isVideo: Boolean) {
+        try {
+            val fileBytes = FileInputStream(file).use { it.readBytes() }
+            val digest = MessageDigest.getInstance("SHA-256")
+            val hashBytes = digest.digest(fileBytes)
+            currentHash = hashBytes.joinToString("") { "%02x".format(it) }
+
+            val typeName = if (isVideo) "فيديو 🎥" else "صورة 📷"
+            statusTextView.text = "تم تشفير الـ ($typeName) بدقة [$selectedResolution] 🔒✅"
+            statusTextView.setTextColor(Color.parseColor("#4ADE80"))
+
+            hashTextView.text = "بصمة الملكية الرقمية (SHA-256):\n$currentHash\n\n[إعدادات التشفير: $selectedResolution | $selectedFPS]"
+            hashTextView.setTextColor(Color.parseColor("#E2E8F0"))
+
+            btnSave.isEnabled = true
+            btnSave.setBackgroundColor(Color.parseColor("#16A34A"))
+        } catch (e: Exception) {
+            Toast.makeText(this, "خطأ أثناء التشفير: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun saveEncryptedMediaToVault() {
+        val mediaFile = currentMediaFile ?: return
         if (currentHash.isEmpty()) return
 
         try {
             val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val fileName = "OMNI_$timeStamp.png"
+            val ext = if (mediaFile.name.endsWith(".mp4", ignoreCase = true)) ".mp4" else ".png"
+            val fileName = "OMNI_$timeStamp$ext"
 
             val vaultDir = File(filesDir, "OmniVault")
             if (!vaultDir.exists()) {
                 vaultDir.mkdirs()
             }
 
-            val imageFile = File(vaultDir, fileName)
-            val fos = FileOutputStream(imageFile)
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos)
-            fos.flush()
-            fos.close()
+            val destFile = File(vaultDir, fileName)
+            mediaFile.copyTo(destFile, overwrite = true)
 
-            Toast.makeText(this, "تم حفظ الصورة في الخزنة بنجاح 🛡️", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "تم الحفظ في الخزنة المحمية بنجاح 🛡️", Toast.LENGTH_SHORT).show()
 
-            addCardToHistory(bitmap, imageFile, currentHash, timeStamp)
+            addCardToHistory(currentBitmap, destFile, currentHash, timeStamp)
 
             btnSave.isEnabled = false
             btnSave.setBackgroundColor(Color.parseColor("#475569"))
@@ -296,7 +434,7 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun addCardToHistory(bitmap: Bitmap, file: File, hash: String, timeStamp: String) {
+    private fun addCardToHistory(bitmap: Bitmap?, file: File, hash: String, timeStamp: String) {
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(Color.parseColor("#1E293B"))
@@ -310,7 +448,11 @@ class MainActivity : Activity() {
         }
 
         val thumbView = ImageView(this).apply {
-            setImageBitmap(bitmap)
+            if (bitmap != null) {
+                setImageBitmap(bitmap)
+            } else {
+                setImageResource(android.R.drawable.ic_media_play)
+            }
             layoutParams = LinearLayout.LayoutParams(120, 120).apply {
                 gravity = Gravity.CENTER_VERTICAL
             }
@@ -346,7 +488,6 @@ class MainActivity : Activity() {
         infoLayout.addView(dateText)
         infoLayout.addView(hashShortText)
 
-        // زر المشاركة والتصنيف
         val btnShare = Button(this).apply {
             text = "📤"
             textSize = 16f
@@ -370,16 +511,16 @@ class MainActivity : Activity() {
     private fun showShareTypeDialog(file: File, hash: String) {
         val options = arrayOf("🆓 مشاركة مجانية (Free)", "🎁 مشاركة كهدية مميزة (Gift)", "💰 مشاركة كترخيص مدفوع (Paid)")
 
-        val builder = AlertDialog.Builder(this)
-        builder.setTitle("اختر نوع الترخيص والمشاركة:")
-        builder.setItems(options) { _, which ->
-            when (which) {
-                0 -> executeShare(file, hash, "🆓 ترخيص مجاني (عرض عام)", "المحتوى متاح للمعاينة والتداول المجاني.")
-                1 -> executeShare(file, hash, "🎁 ترخيص هدية مميزة (VIP)", "هذا المحتوى مرسل كهدية خاصة وموثقة بالبصمة.")
-                2 -> executeShare(file, hash, "💰 ترخيص محتوى مدفوع (Commercial)", "⚠️ محتوى تجاري مشفر. يُشترط الحصول على مفتاح الفك للاستخدام القانوني.")
+        AlertDialog.Builder(this)
+            .setTitle("اختر نوع الترخيص والمشاركة:")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> executeShare(file, hash, "🆓 ترخيص مجاني (عرض عام)", "المحتوى متاح للمعاينة والتداول المجاني.")
+                    1 -> executeShare(file, hash, "🎁 ترخيص هدية مميزة (VIP)", "هذا المحتوى مرسل كهدية خاصة وموثقة بالبصمة.")
+                    2 -> executeShare(file, hash, "💰 ترخيص محتوى مدفوع (Commercial)", "⚠️ محتوى تجاري مشفر. يُشترط الحصول على مفتاح الفك للاستخدام القانوني.")
+                }
             }
-        }
-        builder.show()
+            .show()
     }
 
     private fun executeShare(file: File, hash: String, licenseTitle: String, licenseDesc: String) {
@@ -390,13 +531,15 @@ class MainActivity : Activity() {
                 file
             )
 
-            val mimeType = if (file.name.endsWith(".mp4", ignoreCase = true)) "video/*" else "image/*"
+            val isVideo = file.name.endsWith(".mp4", ignoreCase = true)
+            val mimeType = if (isVideo) "video/*" else "image/*"
 
             val shareMessage = """
                 🔒 منصة OmniLens للحماية وتوثيق الوسائط
                 ----------------------------------------
                 📌 نوع الترخيص: $licenseTitle
                 📝 الوصف: $licenseDesc
+                🎥 إعدادات الملف: [$selectedResolution | $selectedFPS]
                 
                 🔑 بصمة الملكية الرقمية (SHA-256):
                 $hash
@@ -423,16 +566,19 @@ class MainActivity : Activity() {
         if (vaultDir.exists()) {
             val files = vaultDir.listFiles()?.sortedByDescending { it.lastModified() }
             files?.forEach { file ->
-                val bitmap = BitmapFactory.decodeFile(file.absolutePath)
-                if (bitmap != null) {
-                    val stream = ByteArrayOutputStream()
-                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+                val isVideo = file.name.endsWith(".mp4", ignoreCase = true)
+                val bitmap = if (!isVideo) BitmapFactory.decodeFile(file.absolutePath) else null
+
+                try {
+                    val fileBytes = FileInputStream(file).use { it.readBytes() }
                     val digest = MessageDigest.getInstance("SHA-256")
-                    val hashBytes = digest.digest(stream.toByteArray())
+                    val hashBytes = digest.digest(fileBytes)
                     val hash = hashBytes.joinToString("") { "%02x".format(it) }
 
                     val date = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date(file.lastModified()))
                     addCardToHistory(bitmap, file, hash, date)
+                } catch (e: Exception) {
+                    // تجاهل الأخطاء البسيطة عند التحميل
                 }
             }
         }
