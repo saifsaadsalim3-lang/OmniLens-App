@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "OmniLens-App"
+rootProject.name = "OmniLens"
 include(":app")
