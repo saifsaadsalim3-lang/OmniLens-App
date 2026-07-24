@@ -1,29 +1,18 @@
-plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-}
-
 android {
-    namespace = "com.omnilens.omniguard"
-    compileSdk = 34
+    namespace 'com.omnilens.omniguard'
+    compileSdk 34
 
     defaultConfig {
-        applicationId = "com.omnilens.omniguard"
-        minSdk = 24
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
-    }
+        applicationId "com.omnilens.omniguard"
+        minSdk 24
+        targetSdk 34
+        
+        // زيادة رقم الإصدار مع كل تحديث جديد
+        versionCode 2
+        versionName "1.1.0"
 
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-}
-
-dependencies {
-    // لا نحتاج أي مكتبات خارجية حالياً لضمان النجاح
+    
+    // ... باقي إعدادات الملف
 }
