@@ -11,13 +11,12 @@ android {
         applicationId = "com.omnilens.omniguard"
         minSdk = 24
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.3.0"
+        versionCode = 5
+        versionName = "1.7.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    // تخصيص اسم ملف الـ APK الناتج ليكون باسم التطبيق ورقم الإصدار
     applicationVariants.all {
         outputs.all {
             val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
@@ -46,6 +45,7 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     
+    // مكتبات الكاميرا والعتاد CameraX
     val cameraVersion = "1.3.4"
     implementation("androidx.camera:camera-core:$cameraVersion")
     implementation("androidx.camera:camera-camera2:$cameraVersion")
@@ -53,4 +53,7 @@ dependencies {
     implementation("androidx.camera:camera-video:$cameraVersion")
     implementation("androidx.camera:camera-view:$cameraVersion")
     implementation("androidx.camera:camera-extensions:$cameraVersion")
+
+    // مكتبات الشبكة والسيرفر والمزامنة
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }
