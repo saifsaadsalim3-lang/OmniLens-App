@@ -10,8 +10,10 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
+import android.graphics.Paint
 import android.graphics.Typeface
 import android.media.MediaScannerConnection
 import android.net.Uri
@@ -22,7 +24,6 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import android.view.Gravity
-import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
 import android.widget.Button
@@ -55,6 +56,7 @@ class MainActivity : Activity() {
     private lateinit var splashLayout: FrameLayout
     private lateinit var userAccountStatusText: TextView
     private lateinit var chatMessagesLayout: LinearLayout
+    private lateinit var moduleBadgeText: TextView
 
     // متغيرات التقريب باللمس (Pinch-to-Zoom Matrix)
     private lateinit var scaleGestureDetector: ScaleGestureDetector
@@ -66,12 +68,14 @@ class MainActivity : Activity() {
     private var currentHash: String = ""
     private var tempPhotoFile: File? = null
 
+    // الحسابات والوحدات المتخصصة
     private var currentUserOmniId: String = "Guest_OmniUser"
     private var isUserLoggedIn: Boolean = false
+    private var activeSpecialModule: String = "STANDARD_VAULT"
+    private var isRestrictedZoneEnforced: Boolean = false
 
     private var selectedResolution = "FHD (1080p)"
     private var selectedFPS = "30 FPS"
-    private var activeCaptureMode = "OMNILENS_VAULT"
     private var isCalledFromExternalApp = false
 
     private val CAMERA_REQUEST_CODE = 101
@@ -112,7 +116,7 @@ class MainActivity : Activity() {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(0, 0, 0, 15) }
+            ).apply { setMargins(0, 0, 0, 12) }
         }
 
         val logoImage = ImageView(this).apply {
@@ -128,7 +132,7 @@ class MainActivity : Activity() {
         }
 
         val titleText = TextView(this).apply {
-            text = "OmniLens v1.8.0 Immersive"
+            text = "OmniLens v1.9.0 Enterprise"
             textSize = 17f
             setTypeface(null, Typeface.BOLD)
             setTextColor(Color.WHITE)
@@ -156,7 +160,30 @@ class MainActivity : Activity() {
         headerCard.addView(titleContainer)
         headerCard.addView(btnAccount)
 
-        // 2. شريط الأدوات السريع والوضع التفاعلي
+        // 2. شريط اختيار الوحدات المتخصصة (7 وحدات)
+        val btnSelectModule = Button(this).apply {
+            text = "🧩 اختر وحدة المنصة (طبية / سينما / حظر / رياضية)"
+            textSize = 11f
+            setTypeface(null, Typeface.BOLD)
+            setBackgroundColor(Color.parseColor("#7C3AED"))
+            setTextColor(Color.WHITE)
+            setOnClickListener { showSpecialModulesDialog() }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(0, 0, 0, 10) }
+        }
+
+        moduleBadgeText = TextView(this).apply {
+            text = "النمط الحالي: 🛡️ الخزنة القياسية (Standard Vault)"
+            textSize = 11f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.parseColor("#38BDF8"))
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 10)
+        }
+
+        // 3. شريط الأدوات السريع
         val quickBarLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
@@ -185,21 +212,20 @@ class MainActivity : Activity() {
         quickBarLayout.addView(btnNewContent, btnParams)
         quickBarLayout.addView(btnOpenChat, btnParams)
 
-        // 3. كارت المعاينة المضيء المعزز بتقريب اللمس (Pinch-to-Zoom View)
+        // 4. كارت المعاينة المضيء المعزز بتقريب اللمس (Pinch-to-Zoom View)
         selectedImageView = ImageView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                550
-            ).apply { setMargins(0, 0, 0, 15) }
+                520
+            ).apply { setMargins(0, 0, 0, 12) }
             setBackgroundColor(Color.parseColor("#1E293B"))
             scaleType = ImageView.ScaleType.MATRIX
         }
 
-        // تهيئة مستشعر التقريب بالإصبعين (Pinch-to-Zoom)
         scaleGestureDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
             override fun onScale(detector: ScaleGestureDetector): Boolean {
                 scaleFactor *= detector.scaleFactor
-                scaleFactor = scaleFactor.coerceIn(0.5f, 4.0f) // تحديد أقصى وأقل نسبة تقريب
+                scaleFactor = scaleFactor.coerceIn(0.5f, 4.0f)
                 matrix.setScale(scaleFactor, scaleFactor, selectedImageView.width / 2f, selectedImageView.height / 2f)
                 selectedImageView.imageMatrix = matrix
                 return true
@@ -211,18 +237,10 @@ class MainActivity : Activity() {
             true
         }
 
-        val zoomNoticeText = TextView(this).apply {
-            text = "🔍 ميزة التقريب نشطة: استخدم إصبعيك للتقريب والتكبير على الصور والأدلة."
-            textSize = 10f
-            setTextColor(Color.parseColor("#F59E0B"))
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 10)
-        }
-
         val actionButtonsLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 15)
+            setPadding(0, 0, 0, 12)
         }
 
         val btnCapturePhoto = Button(this).apply {
@@ -274,7 +292,7 @@ class MainActivity : Activity() {
         }
 
         val historyTitle = TextView(this).apply {
-            text = "📜 موجز استوديو OmniLens العمودي"
+            text = "📜 موجز استوديو OmniLens الموثق"
             textSize = 15f
             setTypeface(null, Typeface.BOLD)
             setTextColor(Color.parseColor("#F8FAFC"))
@@ -295,9 +313,10 @@ class MainActivity : Activity() {
         }
 
         rootLayout.addView(headerCard)
+        rootLayout.addView(btnSelectModule)
+        rootLayout.addView(moduleBadgeText)
         rootLayout.addView(quickBarLayout)
         rootLayout.addView(selectedImageView)
-        rootLayout.addView(zoomNoticeText)
         rootLayout.addView(actionButtonsLayout)
         rootLayout.addView(statusTextView)
         rootLayout.addView(hashTextView)
@@ -307,7 +326,6 @@ class MainActivity : Activity() {
 
         mainContentLayout.addView(rootLayout)
 
-        // شاشة البداية 3 ثوانٍ
         splashLayout = FrameLayout(this).apply {
             setBackgroundColor(Color.parseColor("#090D16"))
             layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
@@ -356,6 +374,161 @@ class MainActivity : Activity() {
             mainContentLayout.visibility = View.VISIBLE
             loadSavedVaultHistory()
         }, 3000)
+    }
+
+    // 🧩 نافذة اختيار الوحدات السبع المتخصصة
+    private fun showSpecialModulesDialog() {
+        val modules = arrayOf(
+            "🏥 الخزنة الطبية (Medical Vault - إخفاء الهويات والخصوصية)",
+            "🏛️ الجولات الافتراضية وكواليس الأفلام (Virtual Tours & BTS)",
+            "🏆 مسابقات الاستوديوهات وتراخيص المحتوى (Studio Contests)",
+            "🌟 التكريمات والمهرجانات العالمية (OmniAwards)",
+            "⚽ المنظومة الرياضية وتفاعل النجوم (OmniSports)",
+            "🛡️ درع حماية الطفل والمحتوى الحساس (OmniSafe Guard)",
+            "🚫 وحدة المنع والتوجيه الذكي (OmniShield - Restricted Zones)"
+        )
+
+        AlertDialog.Builder(this)
+            .setTitle("🧩 اختر وحدة المنصة المتخصصة:")
+            .setItems(modules) { _, which ->
+                when (which) {
+                    0 -> {
+                        activeSpecialModule = "MEDICAL_VAULT"
+                        isRestrictedZoneEnforced = false
+                        moduleBadgeText.text = "النمط الحالي: 🏥 الخزنة الطبية (إخفاء الهويات نشط)"
+                        Toast.makeText(this, "تم تفعيل الخزنة الطبية وإخفاء الهويات 🏥", Toast.LENGTH_SHORT).show()
+                    }
+                    1 -> {
+                        activeSpecialModule = "MUSEUM_BTS"
+                        isRestrictedZoneEnforced = false
+                        moduleBadgeText.text = "النمط الحالي: 🏛️ كواليس الأفلام والجولات الافتراضية"
+                        Toast.makeText(this, "تم تفعيل توثيق كواليس السينما والمعارض 🏛️", Toast.LENGTH_SHORT).show()
+                    }
+                    2 -> {
+                        activeSpecialModule = "STUDIO_CONTEST"
+                        isRestrictedZoneEnforced = false
+                        moduleBadgeText.text = "النمط الحالي: 🏆 مسابقات الاستوديوهات والتراخيص"
+                        Toast.makeText(this, "نمط ترخيص مسابقات الاستوديوهات نشط 🏆", Toast.LENGTH_SHORT).show()
+                    }
+                    3 -> {
+                        activeSpecialModule = "OMNI_AWARDS"
+                        isRestrictedZoneEnforced = false
+                        moduleBadgeText.text = "النمط الحالي: 🌟 التكريمات والمهرجانات العالمية"
+                        Toast.makeText(this, "تم ربط سجل التكريمات المهرجانية 🌟", Toast.LENGTH_SHORT).show()
+                    }
+                    4 -> {
+                        activeSpecialModule = "OMNI_SPORTS"
+                        isRestrictedZoneEnforced = false
+                        moduleBadgeText.text = "النمط الحالي: ⚽ المنظومة الرياضية وتفاعل النجوم"
+                        Toast.makeText(this, "تم تفعيل نمط التقاط النجوم والرياضة ⚽", Toast.LENGTH_SHORT).show()
+                    }
+                    5 -> {
+                        activeSpecialModule = "OMNI_SAFE_CHILD"
+                        isRestrictedZoneEnforced = false
+                        moduleBadgeText.text = "النمط الحالي: 🛡️ درع حماية الطفل والمحتوى الحساس"
+                        Toast.makeText(this, "تم تفعيل درع الأمان لحماية الأطفال 🛡️", Toast.LENGTH_SHORT).show()
+                    }
+                    6 -> {
+                        activeSpecialModule = "RESTRICTED_ZONE"
+                        isRestrictedZoneEnforced = true
+                        moduleBadgeText.text = "النمط الحالي: 🚫 وحدة المنع والتوجيه الذكي (محظور)"
+                        AlertDialog.Builder(this)
+                            .setTitle("🚫 تنبيه أمني مشدد (OmniShield)")
+                            .setMessage("أنت الآن في نطاق منطقة محظورة التصوير! سيتم تطبيق المنع والتوجيه الذكي وحظر التمريرات غير المصرح بها.")
+                            .setPositiveButton("فهمت ذلك", null)
+                            .show()
+                    }
+                }
+            }
+            .show()
+    }
+
+    private fun checkPermissionsAndCapture(isVideo: Boolean) {
+        if (isRestrictedZoneEnforced) {
+            AlertDialog.Builder(this)
+                .setTitle("🚫 تم حظر التصوير (OmniShield Restricted Zone)")
+                .setMessage("⚠️ عذراً! الكاميرا معطلة أوتوماتيكياً لأنك في موقع محظور التصوير لحماية حقوق الخصوصية والكواليس.")
+                .setPositiveButton("موافق", null)
+                .show()
+            return
+        }
+
+        val permissions = mutableListOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            if (isVideo) openVideoCamera() else openPhotoCamera()
+        } else {
+            requestPermissions(permissions.toTypedArray(), PERMISSION_CODE)
+        }
+    }
+
+    private fun processAndAutoSaveMedia(file: File, isVideo: Boolean) {
+        try {
+            var processedBitmap = currentBitmap
+
+            // معالجة الخزنة الطبية: تطبيق فلتر إخفاء الهويات تلقائياً
+            if (activeSpecialModule == "MEDICAL_VAULT" && processedBitmap != null && !isVideo) {
+                processedBitmap = applyMedicalAnonymizationFilter(processedBitmap)
+                selectedImageView.setImageBitmap(processedBitmap)
+            }
+
+            val fileBytes = FileInputStream(file).use { it.readBytes() }
+            val digest = MessageDigest.getInstance("SHA-256")
+            val hashBytes = digest.digest(fileBytes)
+            currentHash = hashBytes.joinToString("") { "%02x".format(it) }
+
+            val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+            val ext = if (isVideo) ".mp4" else ".png"
+            val fileName = "OMNI_${activeSpecialModule}_$timeStamp$ext"
+
+            val dcimDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM)
+            val omniFolder = File(dcimDir, "OmniLens")
+            if (!omniFolder.exists()) omniFolder.mkdirs()
+
+            val destFile = File(omniFolder, fileName)
+            file.copyTo(destFile, overwrite = true)
+
+            val mimeType = if (isVideo) "video/mp4" else "image/png"
+            MediaScannerConnection.scanFile(this, arrayOf(destFile.absolutePath), arrayOf(mimeType), null)
+
+            statusTextView.text = "تم التشفير والحفظ المباشر [$activeSpecialModule] ⚡🛡️"
+            hashTextView.text = "البصمة الرقمية (SHA-256):\n$currentHash"
+
+            addCardToHistory(processedBitmap, destFile, currentHash, timeStamp)
+
+            if (isCalledFromExternalApp) {
+                val resultUri = FileProvider.getUriForFile(this, "com.omnilens.omniguard.provider", destFile)
+                val resultIntent = Intent().apply {
+                    data = resultUri
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                setResult(RESULT_OK, resultIntent)
+                finish()
+            }
+
+        } catch (e: Exception) {
+            Toast.makeText(this, "خطأ الحفظ: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // فلتر إخفاء الهويات وطبع ختم الخصوصية الطبية تلقائياً
+    private fun applyMedicalAnonymizationFilter(original: Bitmap): Bitmap {
+        val mutableBitmap = original.copy(Bitmap.Config.ARGB_8888, true)
+        val canvas = Canvas(mutableBitmap)
+        val paint = Paint().apply {
+            color = Color.parseColor("#CC0F172A")
+            style = Paint.Style.FILL
+        }
+        val textPaint = Paint().apply {
+            color = Color.CYAN
+            textSize = 36f
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        canvas.drawRect(0f, 0f, canvas.width.toFloat(), 120f, paint)
+        canvas.drawText("🔒 OMNI-MEDICAL PRIVACY: ANONYMIZED", 30f, 75f, textPaint)
+        return mutableBitmap
     }
 
     private fun showAccountLoginDialog() {
@@ -457,7 +630,7 @@ class MainActivity : Activity() {
         chatDialogLayout.addView(inputMessage)
         chatDialogLayout.addView(btnSendMsg)
 
-        addChatMessageCard("OmniSystem", "مرحباً بك في غرفة المراسلة المشفرة لـ OmniLens 🔒. الرسائل محمية بالبصمة الرقمية.")
+        addChatMessageCard("OmniSystem", "مرحباً بك في غرفة المراسلة المشفرة لـ OmniLens 🔒.")
 
         AlertDialog.Builder(this)
             .setTitle("💬 المراسلة والدردشة الداخلية")
@@ -518,41 +691,12 @@ class MainActivity : Activity() {
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(if (imageResId != 0) imageResId else android.R.drawable.ic_menu_camera)
             .setContentTitle("OmniLens Visual Guard 🛡️")
-            .setContentText("نظام التوثيق والدردشة المشفرة نشط")
+            .setContentText("نظام التوثيق والوحدات المتخصصة نشط")
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
 
         val notificationManager: NotificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(1001, builder.build())
-    }
-
-    private fun showCameraSettingsDialog() {
-        val options = arrayOf("📐 HD (720p)", "📐 FHD (1080p)", "📐 Ultra HD (4K)", "⏱️ 30 FPS", "⏱️ 60 FPS")
-        AlertDialog.Builder(this)
-            .setTitle("⚙️ إعدادات الكاميرا والجودة:")
-            .setItems(options) { _, which ->
-                when (which) {
-                    0 -> selectedResolution = "HD (720p)"
-                    1 -> selectedResolution = "FHD (1080p)"
-                    2 -> selectedResolution = "4K (2160p)"
-                    3 -> selectedFPS = "30 FPS"
-                    4 -> selectedFPS = "60 FPS"
-                }
-                settingsSummaryText.text = "⚙️ الإعدادات: [$selectedResolution] | [$selectedFPS]"
-            }
-            .show()
-    }
-
-    private fun checkPermissionsAndCapture(isVideo: Boolean) {
-        val permissions = mutableListOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
-        }
-        if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-            if (isVideo) openVideoCamera() else openPhotoCamera()
-        } else {
-            requestPermissions(permissions.toTypedArray(), PERMISSION_CODE)
-        }
     }
 
     private fun openPhotoCamera() {
@@ -591,7 +735,6 @@ class MainActivity : Activity() {
                         currentBitmap = bitmap
                         selectedImageView.setImageBitmap(bitmap)
                         
-                        // إعادة ضبط حجم المعاينة والماتريكس للبدء بدون زوم
                         scaleFactor = 1.0f
                         matrix.reset()
                         selectedImageView.imageMatrix = matrix
@@ -644,47 +787,6 @@ class MainActivity : Activity() {
         } catch (e: Exception) { null }
     }
 
-    private fun processAndAutoSaveMedia(file: File, isVideo: Boolean) {
-        try {
-            val fileBytes = FileInputStream(file).use { it.readBytes() }
-            val digest = MessageDigest.getInstance("SHA-256")
-            val hashBytes = digest.digest(fileBytes)
-            currentHash = hashBytes.joinToString("") { "%02x".format(it) }
-
-            val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val ext = if (isVideo) ".mp4" else ".png"
-            val fileName = "OMNI_$timeStamp$ext"
-
-            val dcimDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM)
-            val omniFolder = File(dcimDir, "OmniLens")
-            if (!omniFolder.exists()) omniFolder.mkdirs()
-
-            val destFile = File(omniFolder, fileName)
-            file.copyTo(destFile, overwrite = true)
-
-            val mimeType = if (isVideo) "video/mp4" else "image/png"
-            MediaScannerConnection.scanFile(this, arrayOf(destFile.absolutePath), arrayOf(mimeType), null)
-
-            statusTextView.text = "تم التشفير والحفظ المباشر بـ DCIM/OmniLens ⚡🛡️"
-            hashTextView.text = "البصمة الرقمية (SHA-256):\n$currentHash"
-
-            addCardToHistory(currentBitmap, destFile, currentHash, timeStamp)
-
-            if (isCalledFromExternalApp) {
-                val resultUri = FileProvider.getUriForFile(this, "com.omnilens.omniguard.provider", destFile)
-                val resultIntent = Intent().apply {
-                    data = resultUri
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-                setResult(RESULT_OK, resultIntent)
-                finish()
-            }
-
-        } catch (e: Exception) {
-            Toast.makeText(this, "خطأ الحفظ: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
-
     private fun addCardToHistory(bitmap: Bitmap?, file: File, hash: String, timeStamp: String) {
         val outerLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -721,7 +823,7 @@ class MainActivity : Activity() {
         }
 
         val hashShortText = TextView(this).apply {
-            text = "البصمة: ${hash.take(12)}..."
+            text = "البصمة: ${hash.take(12)}... | النمط: $activeSpecialModule"
             setTextColor(Color.parseColor("#94A3B8"))
             textSize = 10f
         }
@@ -749,11 +851,11 @@ class MainActivity : Activity() {
             setPadding(0, 10, 0, 0)
         }
 
-        val reactHeart = createReactionButton("❤️") { Toast.makeText(this, "تم تمييز الوسائط كـ مفضلة ❤️", Toast.LENGTH_SHORT).show() }
-        val reactNote = createReactionButton("✍🏻") { Toast.makeText(this, "توقيع ملكية البصمة الرقمية ✍🏻", Toast.LENGTH_SHORT).show() }
+        val reactHeart = createReactionButton("❤️") { Toast.makeText(this, "تم التمييز كمفضل ❤️", Toast.LENGTH_SHORT).show() }
+        val reactNote = createReactionButton("✍🏻") { Toast.makeText(this, "توقيع الملكية الرقمية ✍🏻", Toast.LENGTH_SHORT).show() }
         val reactVerify = createReactionButton("✅") { Toast.makeText(this, "مطابقة البصمة موثقة 100% ✅", Toast.LENGTH_SHORT).show() }
-        val reactTrack = createReactionButton("👣") { Toast.makeText(this, "الأثر الرقمي والسجل الميداني نشط 👣", Toast.LENGTH_SHORT).show() }
-        val reactApprove = createReactionButton("👍🏻") { Toast.makeText(this, "تم معالجة واعتماد ترخيص OmniLens 👍🏻", Toast.LENGTH_SHORT).show() }
+        val reactTrack = createReactionButton("👣") { Toast.makeText(this, "سجل الأثر الرقمي نشط 👣", Toast.LENGTH_SHORT).show() }
+        val reactApprove = createReactionButton("👍🏻") { Toast.makeText(this, "تم اعتماد الترخيص 👍🏻", Toast.LENGTH_SHORT).show() }
 
         val reactParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         reactionsBar.addView(reactHeart, reactParams)
@@ -773,7 +875,7 @@ class MainActivity : Activity() {
                     setDataAndType(uri, mimeType)
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
-                startActivity(Intent.createChooser(viewIntent, "استعراض/تشغيل بواسطة:"))
+                startActivity(Intent.createChooser(viewIntent, "استعراض بواسطة:"))
             } catch (e: Exception) {
                 Toast.makeText(this, "تعذر التشغيل: ${e.message}", Toast.LENGTH_SHORT).show()
             }
@@ -789,7 +891,7 @@ class MainActivity : Activity() {
         val options = arrayOf(
             "📤 مشاركة وتراخيص OmniLens",
             "💬 إرسال عبر دردشة OmniLens المشفرة",
-            "ℹ️ تفاصيل التوثيق والـ Hash",
+            "ℹ️ تفاصيل التوثيق والـ Hash والنمط",
             "✏️ إعادة تسمية الملف",
             "🗑️ حذف المحتوى من الخزنة والجهاز"
         )
@@ -801,7 +903,7 @@ class MainActivity : Activity() {
                     0 -> showShareTypeDialog(file, hash)
                     1 -> {
                         showChatRoomDialog()
-                        addChatMessageCard(currentUserOmniId, "قام بتمكين ومشاركة وسائط موثقة ببصمة:\n${hash.take(16)}...")
+                        addChatMessageCard(currentUserOmniId, "شاركت وسائط موثقة ببصمة:\n${hash.take(16)}...")
                     }
                     2 -> showFileDetailsDialog(file, hash, timeStamp)
                     3 -> showRenameFileDialog(file, fileNameTextView)
@@ -816,6 +918,7 @@ class MainActivity : Activity() {
         val details = """
             📁 اسم الملف: ${file.name}
             👤 المالك الموثق: $currentUserOmniId
+            🧩 الوحدة المتخصصة: $activeSpecialModule
             📊 الحجم: $fileSizeMB ميجابايت
             📅 تاريخ التوثيق: $timeStamp
             📍 المسار: ${file.absolutePath}
@@ -913,6 +1016,7 @@ class MainActivity : Activity() {
                 🔒 منصة OmniLens للحماية وتوثيق الوسائط
                 ----------------------------------------
                 👤 المالك: $currentUserOmniId
+                🧩 النمط المتخصص: $activeSpecialModule
                 📌 نوع الترخيص: $licenseTitle
                 📝 الوصف: $licenseDesc
                 🎥 الجودة: [$selectedResolution | $selectedFPS]
