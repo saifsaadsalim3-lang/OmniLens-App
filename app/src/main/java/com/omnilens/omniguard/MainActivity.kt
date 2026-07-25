@@ -11,6 +11,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Typeface
 import android.media.MediaScannerConnection
 import android.net.Uri
@@ -21,6 +22,8 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import android.view.Gravity
+import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
@@ -53,12 +56,16 @@ class MainActivity : Activity() {
     private lateinit var userAccountStatusText: TextView
     private lateinit var chatMessagesLayout: LinearLayout
 
+    // متغيرات التقريب باللمس (Pinch-to-Zoom Matrix)
+    private lateinit var scaleGestureDetector: ScaleGestureDetector
+    private var scaleFactor = 1.0f
+    private val matrix = Matrix()
+
     private var currentBitmap: Bitmap? = null
     private var currentMediaFile: File? = null
     private var currentHash: String = ""
     private var tempPhotoFile: File? = null
 
-    // الحسابات والدردشة
     private var currentUserOmniId: String = "Guest_OmniUser"
     private var isUserLoggedIn: Boolean = false
 
@@ -93,14 +100,14 @@ class MainActivity : Activity() {
         val rootLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(30, 40, 30, 40)
+            setPadding(25, 30, 25, 30)
         }
 
-        // 1. الهيدر وحساب المستخدم
+        // 1. الهيدر العائم
         val headerCard = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(25, 20, 25, 20)
+            setPadding(20, 15, 20, 15)
             setBackgroundColor(Color.parseColor("#1E293B"))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -111,24 +118,24 @@ class MainActivity : Activity() {
         val logoImage = ImageView(this).apply {
             val imageResId = resources.getIdentifier("app_icon", "drawable", packageName)
             if (imageResId != 0) setImageResource(imageResId)
-            layoutParams = LinearLayout.LayoutParams(100, 100)
+            layoutParams = LinearLayout.LayoutParams(90, 90)
         }
 
         val titleContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(20, 0, 0, 0)
+            setPadding(15, 0, 0, 0)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
         val titleText = TextView(this).apply {
-            text = "OmniLens v1.7.0 Platform"
-            textSize = 18f
+            text = "OmniLens v1.8.0 Immersive"
+            textSize = 17f
             setTypeface(null, Typeface.BOLD)
             setTextColor(Color.WHITE)
         }
 
         userAccountStatusText = TextView(this).apply {
-            text = "👤 الحساب: $currentUserOmniId (زائر)"
+            text = "👤 الحساب: $currentUserOmniId"
             textSize = 11f
             setTextColor(Color.parseColor("#38BDF8"))
         }
@@ -138,10 +145,10 @@ class MainActivity : Activity() {
 
         val btnAccount = Button(this).apply {
             text = "🔑"
-            textSize = 16f
+            textSize = 15f
             setBackgroundColor(Color.parseColor("#334155"))
             setTextColor(Color.WHITE)
-            layoutParams = LinearLayout.LayoutParams(90, 90)
+            layoutParams = LinearLayout.LayoutParams(85, 85)
             setOnClickListener { showAccountLoginDialog() }
         }
 
@@ -149,11 +156,11 @@ class MainActivity : Activity() {
         headerCard.addView(titleContainer)
         headerCard.addView(btnAccount)
 
-        // 2. شريط الأدوات السريع (إنشاء محتوى / مراسلة مشفرة)
+        // 2. شريط الأدوات السريع والوضع التفاعلي
         val quickBarLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 15)
+            setPadding(0, 0, 0, 12)
         }
 
         val btnNewContent = Button(this).apply {
@@ -178,79 +185,38 @@ class MainActivity : Activity() {
         quickBarLayout.addView(btnNewContent, btnParams)
         quickBarLayout.addView(btnOpenChat, btnParams)
 
-        // 3. نمط الكاميرا وتفضيلات العتاد
-        val modeSelectorTitle = TextView(this).apply {
-            text = "🎯 اختر نمط معالجة الوسائط:"
-            textSize = 12f
-            setTypeface(null, Typeface.BOLD)
-            setTextColor(Color.parseColor("#94A3B8"))
-            setPadding(0, 0, 0, 8)
+        // 3. كارت المعاينة المضيء المعزز بتقريب اللمس (Pinch-to-Zoom View)
+        selectedImageView = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                550
+            ).apply { setMargins(0, 0, 0, 15) }
+            setBackgroundColor(Color.parseColor("#1E293B"))
+            scaleType = ImageView.ScaleType.MATRIX
         }
 
-        val modeButtonsLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 15)
-        }
-
-        val btnModeVault = Button(this).apply {
-            text = "🛡️ تشفير الخزنة"
-            textSize = 10f
-            setBackgroundColor(Color.parseColor("#2563EB"))
-            setTextColor(Color.WHITE)
-            setOnClickListener {
-                activeCaptureMode = "OMNILENS_VAULT"
-                Toast.makeText(this@MainActivity, "وضع تشفير الخزنة التلقائي 🛡️", Toast.LENGTH_SHORT).show()
+        // تهيئة مستشعر التقريب بالإصبعين (Pinch-to-Zoom)
+        scaleGestureDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                scaleFactor *= detector.scaleFactor
+                scaleFactor = scaleFactor.coerceIn(0.5f, 4.0f) // تحديد أقصى وأقل نسبة تقريب
+                matrix.setScale(scaleFactor, scaleFactor, selectedImageView.width / 2f, selectedImageView.height / 2f)
+                selectedImageView.imageMatrix = matrix
+                return true
             }
+        })
+
+        selectedImageView.setOnTouchListener { _, event ->
+            scaleGestureDetector.onTouchEvent(event)
+            true
         }
 
-        val btnModeSocial = Button(this).apply {
-            text = "📲 كاميرا السوشيال"
+        val zoomNoticeText = TextView(this).apply {
+            text = "🔍 ميزة التقريب نشطة: استخدم إصبعيك للتقريب والتكبير على الصور والأدلة."
             textSize = 10f
-            setBackgroundColor(Color.parseColor("#0D9488"))
-            setTextColor(Color.WHITE)
-            setOnClickListener {
-                activeCaptureMode = "SOCIAL_DIRECT"
-                Toast.makeText(this@MainActivity, "وضع كاميرا السوشيال ميديا 📲", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        val btnModeRaw = Button(this).apply {
-            text = "📷 كاميرا عادية"
-            textSize = 10f
-            setBackgroundColor(Color.parseColor("#475569"))
-            setTextColor(Color.WHITE)
-            setOnClickListener {
-                activeCaptureMode = "RAW_CAMERA"
-                Toast.makeText(this@MainActivity, "وضع الكاميرا العادية 📷", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        modeButtonsLayout.addView(btnModeVault, btnParams)
-        modeButtonsLayout.addView(btnModeSocial, btnParams)
-        modeButtonsLayout.addView(btnModeRaw, btnParams)
-
-        settingsSummaryText = TextView(this).apply {
-            text = "⚙️ الإعدادات: [$selectedResolution] | [$selectedFPS]"
-            textSize = 11f
             setTextColor(Color.parseColor("#F59E0B"))
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 8)
-        }
-
-        val btnSettings = Button(this).apply {
-            text = "⚙️ تخصيص دقة وفريمات الكاميرا"
-            setBackgroundColor(Color.parseColor("#1E293B"))
-            setTextColor(Color.parseColor("#CBD5E1"))
-            textSize = 11f
-            setOnClickListener { showCameraSettingsDialog() }
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 0, 0, 15) }
-        }
-
-        selectedImageView = ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 400).apply { setMargins(0, 0, 0, 15) }
-            setBackgroundColor(Color.parseColor("#1E293B"))
-            scaleType = ImageView.ScaleType.FIT_CENTER
+            setPadding(0, 0, 0, 10)
         }
 
         val actionButtonsLayout = LinearLayout(this).apply {
@@ -260,8 +226,8 @@ class MainActivity : Activity() {
         }
 
         val btnCapturePhoto = Button(this).apply {
-            text = "📷 صورة"
-            textSize = 12f
+            text = "📷 التقاط صورة"
+            textSize = 11f
             setTypeface(null, Typeface.BOLD)
             setBackgroundColor(Color.parseColor("#2563EB"))
             setTextColor(Color.WHITE)
@@ -269,8 +235,8 @@ class MainActivity : Activity() {
         }
 
         val btnCaptureVideo = Button(this).apply {
-            text = "🎥 فيديو"
-            textSize = 12f
+            text = "🎥 تسجيل فيديو"
+            textSize = 11f
             setTypeface(null, Typeface.BOLD)
             setBackgroundColor(Color.parseColor("#DC2626"))
             setTextColor(Color.WHITE)
@@ -279,7 +245,7 @@ class MainActivity : Activity() {
 
         val btnPickGallery = Button(this).apply {
             text = "🖼️ المعرض"
-            textSize = 12f
+            textSize = 11f
             setBackgroundColor(Color.parseColor("#059669"))
             setTextColor(Color.WHITE)
             setOnClickListener {
@@ -300,7 +266,7 @@ class MainActivity : Activity() {
         }
 
         hashTextView = TextView(this).apply {
-            text = "⚡ اضغط ⋮ على أي عنصر لإدارته، وتفاعل عبر الأزرار ♥✍🏻✅👣👍🏻"
+            text = "⚡ اضغط ⋮ لإدارة العنصر أو تفاعل عبر الأزرار العائمة."
             textSize = 11f
             setTextColor(Color.parseColor("#94A3B8"))
             gravity = Gravity.CENTER
@@ -308,7 +274,7 @@ class MainActivity : Activity() {
         }
 
         val historyTitle = TextView(this).apply {
-            text = "📜 وسائط استوديو OmniLens الموثقة"
+            text = "📜 موجز استوديو OmniLens العمودي"
             textSize = 15f
             setTypeface(null, Typeface.BOLD)
             setTextColor(Color.parseColor("#F8FAFC"))
@@ -330,11 +296,8 @@ class MainActivity : Activity() {
 
         rootLayout.addView(headerCard)
         rootLayout.addView(quickBarLayout)
-        rootLayout.addView(modeSelectorTitle)
-        rootLayout.addView(modeButtonsLayout)
-        rootLayout.addView(settingsSummaryText)
-        rootLayout.addView(btnSettings)
         rootLayout.addView(selectedImageView)
+        rootLayout.addView(zoomNoticeText)
         rootLayout.addView(actionButtonsLayout)
         rootLayout.addView(statusTextView)
         rootLayout.addView(hashTextView)
@@ -344,6 +307,7 @@ class MainActivity : Activity() {
 
         mainContentLayout.addView(rootLayout)
 
+        // شاشة البداية 3 ثوانٍ
         splashLayout = FrameLayout(this).apply {
             setBackgroundColor(Color.parseColor("#090D16"))
             layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
@@ -394,7 +358,6 @@ class MainActivity : Activity() {
         }, 3000)
     }
 
-    // 🔑 نافذة تسجيل الدخول وحساب OmniLens ID
     private fun showAccountLoginDialog() {
         val options = arrayOf(
             "🆔 تسجيل الدخول بـ OmniLens ID خاص",
@@ -452,7 +415,6 @@ class MainActivity : Activity() {
             .show()
     }
 
-    // 💬 نافذة غرفة الدردشة والمراسلة المشفرة اللحظية
     private fun showChatRoomDialog() {
         val chatDialogLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -495,7 +457,6 @@ class MainActivity : Activity() {
         chatDialogLayout.addView(inputMessage)
         chatDialogLayout.addView(btnSendMsg)
 
-        // إضافة رسالة ترحيب أولية بالدردشة
         addChatMessageCard("OmniSystem", "مرحباً بك في غرفة المراسلة المشفرة لـ OmniLens 🔒. الرسائل محمية بالبصمة الرقمية.")
 
         AlertDialog.Builder(this)
@@ -629,6 +590,12 @@ class MainActivity : Activity() {
                         val bitmap = BitmapFactory.decodeFile(file.absolutePath)
                         currentBitmap = bitmap
                         selectedImageView.setImageBitmap(bitmap)
+                        
+                        // إعادة ضبط حجم المعاينة والماتريكس للبدء بدون زوم
+                        scaleFactor = 1.0f
+                        matrix.reset()
+                        selectedImageView.imageMatrix = matrix
+
                         currentMediaFile = file
                         processAndAutoSaveMedia(file, isVideo = false)
                     }
@@ -651,6 +618,11 @@ class MainActivity : Activity() {
                     if (file != null && bitmap != null) {
                         currentBitmap = bitmap
                         selectedImageView.setImageBitmap(bitmap)
+                        
+                        scaleFactor = 1.0f
+                        matrix.reset()
+                        selectedImageView.imageMatrix = matrix
+
                         currentMediaFile = file
                         processAndAutoSaveMedia(file, isVideo = false)
                     }
