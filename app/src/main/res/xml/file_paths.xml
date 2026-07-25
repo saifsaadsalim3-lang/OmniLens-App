@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <files-path name="omni_vault" path="." />
+    <!-- التخزين الخارجي العام -->
+    <external-path name="external_files" path="." />
+    <!-- التخزين الخارجي الخاص بالتطبيق -->
+    <external-files-path name="external_files_path" path="." />
+    <!-- ذاكرة التخزين المؤقت (Cache) -->
+    <cache-path name="cache_files" path="." />
+    <external-cache-path name="external_cache_files" path="." />
+    <!-- التخزين الداخلي الخاص بالتطبيق -->
+    <files-path name="internal_files" path="." />
+    <!-- المسار الرئيسي للجهاز (حل شامل لكافة المسارات) -->
+    <root-path name="root" path="." />
 </paths>
