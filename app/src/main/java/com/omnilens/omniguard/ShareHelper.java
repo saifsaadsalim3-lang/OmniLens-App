@@ -20,31 +20,32 @@ import java.io.FileOutputStream;
 public class ShareHelper {
 
     /**
-     * دالة مشاركة الصور مع إضافة العلامة المائية وإظهار إشعار الحماية
-     * @param context سياق التطبيق
-     * @param sourceFile الملف المراد مشاركته
-     * @param mimeType نوع الملف (مثل "image/*")
+     * دالة مشاركة الصور مع وضع اللوجو الشفاف في منتصف الصورة وإظهار الإشعار
      */
     public static void shareProtectedFile(Context context, File sourceFile, String mimeType) {
         if (sourceFile == null || !sourceFile.exists()) return;
 
-        // 1️⃣ إضافة اللوجو الشفاف كعلامة مائية على الصورة
-        File watermarkedFile = addWatermarkToImage(context, sourceFile);
+        // 1️⃣ دمج اللوجو في المنتصف بشرط الشفافية المتوسطة
+        File watermarkedFile = addCenterWatermark(context, sourceFile);
 
-        // 2️⃣ إطلاق إشعار التوثيق والحماية
+        // 2️⃣ إطلاق إشعار التوثيق
         showProtectionNotification(context);
 
-        // 3️⃣ إنشاء Content URI باستخدام FileProvider
+        // 3️⃣ إنشاء الـ URI الآمن بـ FileProvider
         String authority = context.getPackageName() + ".fileprovider";
         Uri contentUri = FileProvider.getUriForFile(context, authority, watermarkedFile);
 
-        // 4️⃣ تجهيز Intent المشاركة
+        // 4️⃣ تجهيز أمر المشاركة
         Intent shareIntent = new Intent(Intent.ACTION_SEND);
         shareIntent.setType(mimeType != null ? mimeType : "image/*");
         shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
+        
+        // نص التوثيق المرفق
+        String shareCaption = "🔒 منصة OmniLens للحماية وتوثيق الوسائط\n-----------------------------------\n© جميع الحقوق محفوظة لمنصة OmniLens وللمستخدم.";
+        shareIntent.putExtra(Intent.EXTRA_TEXT, shareCaption);
         shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
-        // 5️⃣ فتح نافذة الاختيار للمستخدم
+        // 5️⃣ فتح قائمة المشاركة
         Intent chooserIntent = Intent.createChooser(shareIntent, "مشاركة صورة محمية عبر OmniLens");
         chooserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
@@ -52,48 +53,59 @@ public class ShareHelper {
     }
 
     /**
-     * دالة رسم الشعار الشفاف فوق الصورة وتوليد نسخة محمية
+     * دالة رسم اللوجو في المنتصف بشفافية متوسطة (Center Watermark)
      */
-    private static File addWatermarkToImage(Context context, File sourceFile) {
+    private static File addCenterWatermark(Context context, File sourceFile) {
         try {
-            Bitmap bitmap = BitmapFactory.decodeFile(sourceFile.getAbsolutePath());
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+            Bitmap bitmap = BitmapFactory.decodeFile(sourceFile.getAbsolutePath(), options);
             if (bitmap == null) return sourceFile;
 
             Bitmap mutableBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true);
             Canvas canvas = new Canvas(mutableBitmap);
 
-            // جلب الشعار app_icon من مجلد drawable
+            // جلب الشعار app_icon
             Drawable watermarkDrawable = ContextCompat.getDrawable(context, R.drawable.app_icon);
             if (watermarkDrawable == null) return sourceFile;
 
-            // تحديد حجم الشعار (ربع عرض الصورة)
-            int watermarkWidth = mutableBitmap.getWidth() / 4;
-            int watermarkHeight = (watermarkWidth * watermarkDrawable.getIntrinsicHeight()) / watermarkDrawable.getIntrinsicWidth();
+            // 📐 حساب أبعاد اللوجو (ليكون حوالي 35% من عرض الصورة)
+            int watermarkWidth = (int) (mutableBitmap.getWidth() * 0.35);
+            int intrinsicWidth = watermarkDrawable.getIntrinsicWidth();
+            int intrinsicHeight = watermarkDrawable.getIntrinsicHeight();
 
-            // تحديد موقع الشعار (أسفل اليمين)
-            int left = mutableBitmap.getWidth() - watermarkWidth - 40;
-            int top = mutableBitmap.getHeight() - watermarkHeight - 40;
+            int watermarkHeight;
+            if (intrinsicWidth > 0 && intrinsicHeight > 0) {
+                watermarkHeight = (watermarkWidth * intrinsicHeight) / intrinsicWidth;
+            } else {
+                watermarkHeight = watermarkWidth; // أبعاد افتراضية حماية للأنواع الأخرى
+            }
+
+            // 🎯 وضع اللوجو في المكرز/المنتصف بالضبط
+            int left = (mutableBitmap.getWidth() - watermarkWidth) / 2;
+            int top = (mutableBitmap.getHeight() - watermarkHeight) / 2;
 
             watermarkDrawable.setBounds(left, top, left + watermarkWidth, top + watermarkHeight);
-            watermarkDrawable.setAlpha(140); // درجة الشفافية (140 من 255 - شفافية متوسطة)
+            watermarkDrawable.setAlpha(120); // 👈 شفافية متوسطة (حوالي 47%)
             watermarkDrawable.draw(canvas);
 
-            // حفظ الصورة المؤقتة في مجلد Cache
-            File cacheFile = new File(context.getCacheDir(), "omnilens_protected_" + System.currentTimeMillis() + ".png");
+            // 💾 حفظ الصورة المائية في مجلد الكاش
+            File cacheFile = new File(context.getCacheDir(), "omnilens_watermarked_" + System.currentTimeMillis() + ".png");
             FileOutputStream outputStream = new FileOutputStream(cacheFile);
             mutableBitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
             outputStream.flush();
             outputStream.close();
 
             return cacheFile;
+
         } catch (Exception e) {
             e.printStackTrace();
-            return sourceFile; // إرجاع الصورة الأصلية في حال حدوث أي خطأ لضمان استمرار المشاركة
+            return sourceFile;
         }
     }
 
     /**
-     * دالة إرسال إشعار أمان OmniLens
+     * إظهار إشعار حماية وتوثيق الوسائط
      */
     private static void showProtectionNotification(Context context) {
         String channelId = "omnilens_security_channel";
