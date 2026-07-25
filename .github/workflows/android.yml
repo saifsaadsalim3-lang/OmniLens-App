@@ -22,11 +22,11 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # 3️⃣ إنشاء ملف gradlew تلقائياً في حال عدم وجوده ومنحه صلاحية التشغيل
-      - name: Setup Gradle Wrapper
+      # 3️⃣ تثبيت Gradle Wrapper المستقر (الإصدار 8.5 المتوافق مع أندرويد)
+      - name: Setup Gradle Wrapper (v8.5)
         run: |
           if [ ! -f "gradlew" ]; then
-            gradle wrapper
+            gradle wrapper --gradle-version 8.5
           fi
           chmod +x gradlew
 
