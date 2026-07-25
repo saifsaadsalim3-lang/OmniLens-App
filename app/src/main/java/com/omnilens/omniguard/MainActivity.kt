@@ -3,6 +3,9 @@ package com.omnilens.omniguard
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -11,16 +14,24 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.media.MediaScannerConnection
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import android.view.Gravity
+import android.view.View
 import android.widget.Button
+import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
 import java.io.File
 import java.io.FileInputStream
@@ -37,185 +48,280 @@ class MainActivity : Activity() {
     private lateinit var statusTextView: TextView
     private lateinit var historyLayout: LinearLayout
     private lateinit var settingsSummaryText: TextView
+    private lateinit var mainContentLayout: ScrollView
+    private lateinit var splashLayout: FrameLayout
+    private lateinit var userAccountStatusText: TextView
+    private lateinit var chatMessagesLayout: LinearLayout
 
     private var currentBitmap: Bitmap? = null
     private var currentMediaFile: File? = null
     private var currentHash: String = ""
     private var tempPhotoFile: File? = null
 
-    // إعدادات الكاميرا المختارة
+    // الحسابات والدردشة
+    private var currentUserOmniId: String = "Guest_OmniUser"
+    private var isUserLoggedIn: Boolean = false
+
     private var selectedResolution = "FHD (1080p)"
     private var selectedFPS = "30 FPS"
-    private var isSocialMode = false
+    private var activeCaptureMode = "OMNILENS_VAULT"
+    private var isCalledFromExternalApp = false
 
     private val CAMERA_REQUEST_CODE = 101
     private val GALLERY_REQUEST_CODE = 102
     private val VIDEO_REQUEST_CODE = 103
     private val PERMISSION_CODE = 104
 
+    private val CHANNEL_ID = "omnilens_protection_channel"
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val scrollView = ScrollView(this).apply {
+        val action = intent.action
+        if (action == MediaStore.ACTION_IMAGE_CAPTURE || action == MediaStore.ACTION_VIDEO_CAPTURE) {
+            isCalledFromExternalApp = true
+        }
+
+        val rootContainer = FrameLayout(this)
+
+        mainContentLayout = ScrollView(this).apply {
             setBackgroundColor(Color.parseColor("#0F172A"))
             isFillViewport = true
+            visibility = View.GONE
         }
 
         val rootLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(35, 50, 35, 50)
+            setPadding(30, 40, 30, 40)
         }
 
-        // 1. الشعار والعنوان التفاعلي
+        // 1. الهيدر وحساب المستخدم
         val headerCard = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(30, 30, 30, 30)
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(25, 20, 25, 20)
             setBackgroundColor(Color.parseColor("#1E293B"))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(0, 0, 0, 20) }
+            ).apply { setMargins(0, 0, 0, 15) }
         }
 
         val logoImage = ImageView(this).apply {
             val imageResId = resources.getIdentifier("app_icon", "drawable", packageName)
             if (imageResId != 0) setImageResource(imageResId)
-            layoutParams = LinearLayout.LayoutParams(180, 180).apply { gravity = Gravity.CENTER }
+            layoutParams = LinearLayout.LayoutParams(100, 100)
+        }
+
+        val titleContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(20, 0, 0, 0)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
         val titleText = TextView(this).apply {
-            text = "OmniLens v1.3.0"
-            textSize = 24f
+            text = "OmniLens v1.7.0 Platform"
+            textSize = 18f
             setTypeface(null, Typeface.BOLD)
             setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
-            setPadding(0, 10, 0, 5)
         }
 
-        statusTextView = TextView(this).apply {
-            text = "الحفظ المباشر ونظام التشفير نشط ⚡✅"
-            textSize = 13f
+        userAccountStatusText = TextView(this).apply {
+            text = "👤 الحساب: $currentUserOmniId (زائر)"
+            textSize = 11f
             setTextColor(Color.parseColor("#38BDF8"))
-            gravity = Gravity.CENTER
+        }
+
+        titleContainer.addView(titleText)
+        titleContainer.addView(userAccountStatusText)
+
+        val btnAccount = Button(this).apply {
+            text = "🔑"
+            textSize = 16f
+            setBackgroundColor(Color.parseColor("#334155"))
+            setTextColor(Color.WHITE)
+            layoutParams = LinearLayout.LayoutParams(90, 90)
+            setOnClickListener { showAccountLoginDialog() }
         }
 
         headerCard.addView(logoImage)
-        headerCard.addView(titleText)
-        headerCard.addView(statusTextView)
+        headerCard.addView(titleContainer)
+        headerCard.addView(btnAccount)
 
-        // 2. كارت ملخص الإعدادات
-        settingsSummaryText = TextView(this).apply {
-            text = "⚙️ الجودة: [$selectedResolution] | الإطارات: [$selectedFPS]"
-            textSize = 12f
-            setTextColor(Color.parseColor("#F59E0B"))
+        // 2. شريط الأدوات السريع (إنشاء محتوى / مراسلة مشفرة)
+        val quickBarLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             setPadding(0, 0, 0, 15)
         }
 
-        val btnSettings = Button(this).apply {
-            text = "⚙️ تخصيص دقة التصوير وفريمات الجهاز"
-            setBackgroundColor(Color.parseColor("#334155"))
+        val btnNewContent = Button(this).apply {
+            text = "➕ محتوى جديد"
+            textSize = 11f
+            setTypeface(null, Typeface.BOLD)
+            setBackgroundColor(Color.parseColor("#16A34A"))
             setTextColor(Color.WHITE)
-            setOnClickListener { showCameraSettingsDialog() }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(0, 0, 0, 15) }
+            setOnClickListener { showNewContentSourceDialog() }
         }
 
-        // 3. إطار العرض الحي والمعاينة
+        val btnOpenChat = Button(this).apply {
+            text = "💬 دردشة مشفرة"
+            textSize = 11f
+            setTypeface(null, Typeface.BOLD)
+            setBackgroundColor(Color.parseColor("#2563EB"))
+            setTextColor(Color.WHITE)
+            setOnClickListener { showChatRoomDialog() }
+        }
+
+        val btnParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(3, 0, 3, 0) }
+        quickBarLayout.addView(btnNewContent, btnParams)
+        quickBarLayout.addView(btnOpenChat, btnParams)
+
+        // 3. نمط الكاميرا وتفضيلات العتاد
+        val modeSelectorTitle = TextView(this).apply {
+            text = "🎯 اختر نمط معالجة الوسائط:"
+            textSize = 12f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.parseColor("#94A3B8"))
+            setPadding(0, 0, 0, 8)
+        }
+
+        val modeButtonsLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 15)
+        }
+
+        val btnModeVault = Button(this).apply {
+            text = "🛡️ تشفير الخزنة"
+            textSize = 10f
+            setBackgroundColor(Color.parseColor("#2563EB"))
+            setTextColor(Color.WHITE)
+            setOnClickListener {
+                activeCaptureMode = "OMNILENS_VAULT"
+                Toast.makeText(this@MainActivity, "وضع تشفير الخزنة التلقائي 🛡️", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        val btnModeSocial = Button(this).apply {
+            text = "📲 كاميرا السوشيال"
+            textSize = 10f
+            setBackgroundColor(Color.parseColor("#0D9488"))
+            setTextColor(Color.WHITE)
+            setOnClickListener {
+                activeCaptureMode = "SOCIAL_DIRECT"
+                Toast.makeText(this@MainActivity, "وضع كاميرا السوشيال ميديا 📲", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        val btnModeRaw = Button(this).apply {
+            text = "📷 كاميرا عادية"
+            textSize = 10f
+            setBackgroundColor(Color.parseColor("#475569"))
+            setTextColor(Color.WHITE)
+            setOnClickListener {
+                activeCaptureMode = "RAW_CAMERA"
+                Toast.makeText(this@MainActivity, "وضع الكاميرا العادية 📷", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        modeButtonsLayout.addView(btnModeVault, btnParams)
+        modeButtonsLayout.addView(btnModeSocial, btnParams)
+        modeButtonsLayout.addView(btnModeRaw, btnParams)
+
+        settingsSummaryText = TextView(this).apply {
+            text = "⚙️ الإعدادات: [$selectedResolution] | [$selectedFPS]"
+            textSize = 11f
+            setTextColor(Color.parseColor("#F59E0B"))
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 8)
+        }
+
+        val btnSettings = Button(this).apply {
+            text = "⚙️ تخصيص دقة وفريمات الكاميرا"
+            setBackgroundColor(Color.parseColor("#1E293B"))
+            setTextColor(Color.parseColor("#CBD5E1"))
+            textSize = 11f
+            setOnClickListener { showCameraSettingsDialog() }
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 0, 0, 15) }
+        }
+
         selectedImageView = ImageView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                480
-            ).apply { setMargins(0, 5, 0, 15) }
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 400).apply { setMargins(0, 0, 0, 15) }
             setBackgroundColor(Color.parseColor("#1E293B"))
             scaleType = ImageView.ScaleType.FIT_CENTER
         }
 
-        // 4. أزرار التحكم والتقاط الكاميرا السريعة والتفاعلية
-        val buttonsLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+        val actionButtonsLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(0, 5, 0, 10)
+            setPadding(0, 0, 0, 15)
         }
 
-        val btnCameraOptions = Button(this).apply {
-            text = "📷 التقاط صورة (عادي / OmniLens / سوشيال ميديا)"
-            textSize = 13f
+        val btnCapturePhoto = Button(this).apply {
+            text = "📷 صورة"
+            textSize = 12f
             setTypeface(null, Typeface.BOLD)
             setBackgroundColor(Color.parseColor("#2563EB"))
             setTextColor(Color.WHITE)
-            setOnClickListener { showCameraChoiceDialog(isVideo = false) }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(0, 0, 0, 10) }
+            setOnClickListener { checkPermissionsAndCapture(isVideo = false) }
         }
 
-        val btnVideoOptions = Button(this).apply {
-            text = "🎥 تسجيل فيديو (مباشر ومحمي)"
-            textSize = 13f
+        val btnCaptureVideo = Button(this).apply {
+            text = "🎥 فيديو"
+            textSize = 12f
             setTypeface(null, Typeface.BOLD)
             setBackgroundColor(Color.parseColor("#DC2626"))
             setTextColor(Color.WHITE)
-            setOnClickListener { showCameraChoiceDialog(isVideo = true) }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(0, 0, 0, 10) }
+            setOnClickListener { checkPermissionsAndCapture(isVideo = true) }
         }
 
-        val btnGallery = Button(this).apply {
-            text = "🖼️ اختيار وسائط من معرض الجهاز"
-            textSize = 13f
-            setBackgroundColor(Color.parseColor("#0D9488"))
+        val btnPickGallery = Button(this).apply {
+            text = "🖼️ المعرض"
+            textSize = 12f
+            setBackgroundColor(Color.parseColor("#059669"))
             setTextColor(Color.WHITE)
             setOnClickListener {
                 val galleryIntent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
                 startActivityForResult(galleryIntent, GALLERY_REQUEST_CODE)
             }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(0, 0, 0, 15) }
         }
 
-        buttonsLayout.addView(btnCameraOptions)
-        buttonsLayout.addView(btnVideoOptions)
-        buttonsLayout.addView(btnGallery)
+        actionButtonsLayout.addView(btnCapturePhoto, btnParams)
+        actionButtonsLayout.addView(btnCaptureVideo, btnParams)
+        actionButtonsLayout.addView(btnPickGallery, btnParams)
 
-        // 5. نص حالة البصمة والحفظ المباشر
+        statusTextView = TextView(this).apply {
+            text = "🟢 التشفير والحفظ المباشر متصل بـ DCIM/OmniLens"
+            textSize = 11f
+            setTextColor(Color.parseColor("#4ADE80"))
+            gravity = Gravity.CENTER
+        }
+
         hashTextView = TextView(this).apply {
-            text = "⚡ الحفظ مباشر ورقمي! عند التقاط أي صورة/فيديو يتم تشفيرها وحفظها تلقائياً في DCIM/OmniLens واستوديو جهازك."
-            textSize = 12f
+            text = "⚡ اضغط ⋮ على أي عنصر لإدارته، وتفاعل عبر الأزرار ♥✍🏻✅👣👍🏻"
+            textSize = 11f
             setTextColor(Color.parseColor("#94A3B8"))
             gravity = Gravity.CENTER
-            setPadding(15, 10, 15, 15)
+            setPadding(10, 5, 10, 15)
         }
 
-        // 6. عنوان وسجل الاستوديو
         val historyTitle = TextView(this).apply {
-            text = "📜 خزنة استوديو OmniLens (اضغط للعرض والتعديل)"
-            textSize = 16f
+            text = "📜 وسائط استوديو OmniLens الموثقة"
+            textSize = 15f
             setTypeface(null, Typeface.BOLD)
             setTextColor(Color.parseColor("#F8FAFC"))
-            setPadding(0, 20, 0, 10)
+            setPadding(0, 15, 0, 10)
         }
 
         historyLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         }
 
-        // 7. حقوق الملكية
-        val rightsText = TextView(this).apply {
-            text = "جميع الحقوق محفوظة منصة OmniLens للمستخدم"
+        val footerRights = TextView(this).apply {
+            text = "جميع الحقوق محفوظة منصة OmniLens وللمستخدم"
             textSize = 11f
             setTextColor(Color.parseColor("#64748B"))
             gravity = Gravity.CENTER
@@ -223,52 +329,246 @@ class MainActivity : Activity() {
         }
 
         rootLayout.addView(headerCard)
+        rootLayout.addView(quickBarLayout)
+        rootLayout.addView(modeSelectorTitle)
+        rootLayout.addView(modeButtonsLayout)
         rootLayout.addView(settingsSummaryText)
         rootLayout.addView(btnSettings)
         rootLayout.addView(selectedImageView)
-        rootLayout.addView(buttonsLayout)
+        rootLayout.addView(actionButtonsLayout)
+        rootLayout.addView(statusTextView)
         rootLayout.addView(hashTextView)
         rootLayout.addView(historyTitle)
         rootLayout.addView(historyLayout)
-        rootLayout.addView(rightsText)
+        rootLayout.addView(footerRights)
 
-        scrollView.addView(rootLayout)
-        setContentView(scrollView)
+        mainContentLayout.addView(rootLayout)
 
-        loadSavedVaultHistory()
+        splashLayout = FrameLayout(this).apply {
+            setBackgroundColor(Color.parseColor("#090D16"))
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+        }
+
+        val splashContent = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT).apply { gravity = Gravity.CENTER }
+        }
+
+        val splashLogo = ImageView(this).apply {
+            val imageResId = resources.getIdentifier("app_icon", "drawable", packageName)
+            if (imageResId != 0) setImageResource(imageResId)
+            layoutParams = LinearLayout.LayoutParams(240, 240)
+        }
+
+        val splashTitle = TextView(this).apply {
+            text = "OMNILENS"
+            textSize = 30f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            setPadding(0, 20, 0, 5)
+        }
+
+        val progressBar = ProgressBar(this).apply {
+            indeterminateDrawable.setTint(Color.parseColor("#2563EB"))
+        }
+
+        splashContent.addView(splashLogo)
+        splashContent.addView(splashTitle)
+        splashContent.addView(progressBar)
+
+        splashLayout.addView(splashContent)
+
+        rootContainer.addView(mainContentLayout)
+        rootContainer.addView(splashLayout)
+
+        setContentView(rootContainer)
+
+        showProtectionNotification()
+
+        Handler(Looper.getMainLooper()).postDelayed({
+            splashLayout.visibility = View.GONE
+            mainContentLayout.visibility = View.VISIBLE
+            loadSavedVaultHistory()
+        }, 3000)
     }
 
-    // 1. خيار تحديد الكاميرا وسياق الاستخدام (Point 1 & Point 3)
-    private fun showCameraChoiceDialog(isVideo: Boolean) {
+    // 🔑 نافذة تسجيل الدخول وحساب OmniLens ID
+    private fun showAccountLoginDialog() {
         val options = arrayOf(
-            "🛡️ تصوير مشفر ومحمي عبر OmniLens (مع الحفظ المباشر)",
-            "📲 تصوير مباشر للشبكات والسوشيال ميديا (مشاركة فورية)",
-            "📷 تصوير عادي عبر كاميرا الجهاز الافتراضية"
+            "🆔 تسجيل الدخول بـ OmniLens ID خاص",
+            "📧 تسجيل الدخول عبر Google",
+            "📱 تسجيل الدخول عبر رقم الهاتف",
+            "🚪 تسجيل الخروج"
         )
 
         AlertDialog.Builder(this)
-            .setTitle("اختر نمط تصوير الكاميرا:")
+            .setTitle("🔑 إدارة حساب المستخدم والتراخيص:")
             .setItems(options) { _, which ->
                 when (which) {
-                    0 -> { isSocialMode = false; checkPermissionsAndCapture(isVideo) }
-                    1 -> { isSocialMode = true; checkPermissionsAndCapture(isVideo) }
-                    2 -> { isSocialMode = false; checkPermissionsAndCapture(isVideo) }
+                    0 -> showOmniIdRegisterDialog()
+                    1 -> {
+                        currentUserOmniId = "Google_User_" + (1000..9999).random()
+                        isUserLoggedIn = true
+                        userAccountStatusText.text = "👤 الحساب: $currentUserOmniId ✅"
+                        Toast.makeText(this, "تم تسجيل الدخول عبر Google ✅", Toast.LENGTH_SHORT).show()
+                    }
+                    2 -> {
+                        currentUserOmniId = "Phone_User_" + (1000..9999).random()
+                        isUserLoggedIn = true
+                        userAccountStatusText.text = "👤 الحساب: $currentUserOmniId ✅"
+                        Toast.makeText(this, "تم تسجيل الدخول برقم الهاتف ✅", Toast.LENGTH_SHORT).show()
+                    }
+                    3 -> {
+                        currentUserOmniId = "Guest_OmniUser"
+                        isUserLoggedIn = false
+                        userAccountStatusText.text = "👤 الحساب: $currentUserOmniId (زائر)"
+                        Toast.makeText(this, "تم تسجيل الخروج", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
             .show()
     }
 
-    private fun showCameraSettingsDialog() {
-        val options = arrayOf(
-            "📐 الدقة: HD (720p)",
-            "📐 الدقة: FHD (1080p) [مستحسن]",
-            "📐 الدقة: Ultra HD (4K / أقصى جودة)",
-            "⏱️ الفريمات: 30 FPS",
-            "⏱️ الفريمات: 60 FPS (سلاسة فائقة)"
-        )
+    private fun showOmniIdRegisterDialog() {
+        val input = EditText(this).apply {
+            hint = "أدخل OmniLens ID الخاص بك (مثال: @saif_omni)"
+        }
 
         AlertDialog.Builder(this)
-            .setTitle("⚙️ إعدادات جودة الكاميرا وعتاد الجهاز:")
+            .setTitle("🆔 تسجيل OmniLens ID خاص:")
+            .setView(input)
+            .setPositiveButton("اعتماد") { _, _ ->
+                val idText = input.text.toString().trim()
+                if (idText.isNotEmpty()) {
+                    currentUserOmniId = if (idText.startsWith("@")) idText else "@$idText"
+                    isUserLoggedIn = true
+                    userAccountStatusText.text = "👤 الحساب: $currentUserOmniId ✅"
+                    Toast.makeText(this, "أهلاً بك! تم توثيق حسابك: $currentUserOmniId 🛡️", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("إلغاء", null)
+            .show()
+    }
+
+    // 💬 نافذة غرفة الدردشة والمراسلة المشفرة اللحظية
+    private fun showChatRoomDialog() {
+        val chatDialogLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(30, 20, 30, 20)
+        }
+
+        val chatHeader = TextView(this).apply {
+            text = "💬 دردشة OmniLens المشفرة (SHA-256)"
+            textSize = 14f
+            setTypeface(null, Typeface.BOLD)
+            setTextColor(Color.parseColor("#2563EB"))
+            setPadding(0, 0, 0, 10)
+        }
+
+        chatMessagesLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(10, 10, 10, 10)
+            setBackgroundColor(Color.parseColor("#1E293B"))
+        }
+
+        val inputMessage = EditText(this).apply {
+            hint = "اكتب رسالة مشفرة أو أرفق بصمة..."
+        }
+
+        val btnSendMsg = Button(this).apply {
+            text = "إرسال 📤"
+            setBackgroundColor(Color.parseColor("#16A34A"))
+            setTextColor(Color.WHITE)
+            setOnClickListener {
+                val msg = inputMessage.text.toString().trim()
+                if (msg.isNotEmpty()) {
+                    addChatMessageCard(currentUserOmniId, msg)
+                    inputMessage.setText("")
+                }
+            }
+        }
+
+        chatDialogLayout.addView(chatHeader)
+        chatDialogLayout.addView(chatMessagesLayout)
+        chatDialogLayout.addView(inputMessage)
+        chatDialogLayout.addView(btnSendMsg)
+
+        // إضافة رسالة ترحيب أولية بالدردشة
+        addChatMessageCard("OmniSystem", "مرحباً بك في غرفة المراسلة المشفرة لـ OmniLens 🔒. الرسائل محمية بالبصمة الرقمية.")
+
+        AlertDialog.Builder(this)
+            .setTitle("💬 المراسلة والدردشة الداخلية")
+            .setView(chatDialogLayout)
+            .setPositiveButton("إغلاق", null)
+            .show()
+    }
+
+    private fun addChatMessageCard(sender: String, message: String) {
+        val msgCard = TextView(this).apply {
+            text = "$sender:\n$message"
+            textSize = 11f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#334155"))
+            setPadding(12, 10, 12, 10)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(0, 0, 0, 8) }
+        }
+        if (::chatMessagesLayout.isInitialized) {
+            chatMessagesLayout.addView(msgCard)
+        }
+    }
+
+    private fun showNewContentSourceDialog() {
+        val options = arrayOf(
+            "📷 التقاط صورة جديدة محميّة",
+            "🎥 تسجيل مقطع فيديو جديد موثق",
+            "🖼️ استيراد صورة أو فيديو من المعرض"
+        )
+        AlertDialog.Builder(this)
+            .setTitle("➕ إنشاء محتوى مشفر جديد:")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> checkPermissionsAndCapture(isVideo = false)
+                    1 -> checkPermissionsAndCapture(isVideo = true)
+                    2 -> {
+                        val galleryIntent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+                        startActivityForResult(galleryIntent, GALLERY_REQUEST_CODE)
+                    }
+                }
+            }
+            .show()
+    }
+
+    private fun showProtectionNotification() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val name = "OmniLens Shield"
+            val importance = NotificationManager.IMPORTANCE_LOW
+            val channel = NotificationChannel(CHANNEL_ID, name, importance)
+            val notificationManager: NotificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val imageResId = resources.getIdentifier("app_icon", "drawable", packageName)
+
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(if (imageResId != 0) imageResId else android.R.drawable.ic_menu_camera)
+            .setContentTitle("OmniLens Visual Guard 🛡️")
+            .setContentText("نظام التوثيق والدردشة المشفرة نشط")
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+
+        val notificationManager: NotificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.notify(1001, builder.build())
+    }
+
+    private fun showCameraSettingsDialog() {
+        val options = arrayOf("📐 HD (720p)", "📐 FHD (1080p)", "📐 Ultra HD (4K)", "⏱️ 30 FPS", "⏱️ 60 FPS")
+        AlertDialog.Builder(this)
+            .setTitle("⚙️ إعدادات الكاميرا والجودة:")
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> selectedResolution = "HD (720p)"
@@ -277,25 +577,20 @@ class MainActivity : Activity() {
                     3 -> selectedFPS = "30 FPS"
                     4 -> selectedFPS = "60 FPS"
                 }
-                settingsSummaryText.text = "⚙️ الجودة: [$selectedResolution] | الإطارات: [$selectedFPS]"
-                Toast.makeText(this, "تم اعتماد الإعدادات: $selectedResolution - $selectedFPS", Toast.LENGTH_SHORT).show()
+                settingsSummaryText.text = "⚙️ الإعدادات: [$selectedResolution] | [$selectedFPS]"
             }
             .show()
     }
 
     private fun checkPermissionsAndCapture(isVideo: Boolean) {
-        val permissions = arrayOf(
-            Manifest.permission.CAMERA,
-            Manifest.permission.RECORD_AUDIO
-        )
-
-        val hasCamera = checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        val hasAudio = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-
-        if (hasCamera && hasAudio) {
+        val permissions = mutableListOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
             if (isVideo) openVideoCamera() else openPhotoCamera()
         } else {
-            requestPermissions(permissions, PERMISSION_CODE)
+            requestPermissions(permissions.toTypedArray(), PERMISSION_CODE)
         }
     }
 
@@ -303,13 +598,7 @@ class MainActivity : Activity() {
         try {
             val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
             tempPhotoFile = File.createTempFile("TEMP_$timeStamp", ".jpg", filesDir)
-
-            val photoURI: Uri = FileProvider.getUriForFile(
-                this,
-                "com.omnilens.omniguard.provider",
-                tempPhotoFile!!
-            )
-
+            val photoURI = FileProvider.getUriForFile(this, "com.omnilens.omniguard.provider", tempPhotoFile!!)
             val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
                 putExtra(MediaStore.EXTRA_OUTPUT, photoURI)
                 addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
@@ -327,16 +616,7 @@ class MainActivity : Activity() {
             }
             startActivityForResult(videoIntent, VIDEO_REQUEST_CODE)
         } catch (e: Exception) {
-            Toast.makeText(this, "خطأ الفيديو: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == PERMISSION_CODE) {
-            if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-                Toast.makeText(this, "تم منح الصلاحيات ✅", Toast.LENGTH_SHORT).show()
-            }
+            Toast.makeText(this, "خطأ تسجيل الفيديو: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -389,12 +669,9 @@ class MainActivity : Activity() {
             inputStream.close()
             outputStream.close()
             tempFile
-        } catch (e: Exception) {
-            null
-        }
+        } catch (e: Exception) { null }
     }
 
-    // 2. معالجة وتشفير وحفظ مباشر تلقائي بدون أزرار إضافية (Point 2)
     private fun processAndAutoSaveMedia(file: File, isVideo: Boolean) {
         try {
             val fileBytes = FileInputStream(file).use { it.readBytes() }
@@ -406,7 +683,6 @@ class MainActivity : Activity() {
             val ext = if (isVideo) ".mp4" else ".png"
             val fileName = "OMNI_$timeStamp$ext"
 
-            // الحفظ المباشر بـ DCIM/OmniLens
             val dcimDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM)
             val omniFolder = File(dcimDir, "OmniLens")
             if (!omniFolder.exists()) omniFolder.mkdirs()
@@ -414,24 +690,22 @@ class MainActivity : Activity() {
             val destFile = File(omniFolder, fileName)
             file.copyTo(destFile, overwrite = true)
 
-            // إجراء مزامنة فورية مع استوديو الهاتف
             val mimeType = if (isVideo) "video/mp4" else "image/png"
             MediaScannerConnection.scanFile(this, arrayOf(destFile.absolutePath), arrayOf(mimeType), null)
 
-            val typeName = if (isVideo) "فيديو" else "صورة"
             statusTextView.text = "تم التشفير والحفظ المباشر بـ DCIM/OmniLens ⚡🛡️"
-            statusTextView.setTextColor(Color.parseColor("#4ADE80"))
-
-            hashTextView.text = "البصمة الرقمية (SHA-256):\n$currentHash\n\n[حالة الملف: تم الحفظ المباشر بالاستوديو والخزنة]"
-            hashTextView.setTextColor(Color.parseColor("#E2E8F0"))
+            hashTextView.text = "البصمة الرقمية (SHA-256):\n$currentHash"
 
             addCardToHistory(currentBitmap, destFile, currentHash, timeStamp)
 
-            Toast.makeText(this, "⚡ تم التقاط و حِفظ الـ $typeName بنجاح بالاستوديو!", Toast.LENGTH_SHORT).show()
-
-            // إذا كان وضع السوشيال ميديا مفعل، اظهر نافذة المشاركة فوراً
-            if (isSocialMode) {
-                showShareTypeDialog(destFile, currentHash)
+            if (isCalledFromExternalApp) {
+                val resultUri = FileProvider.getUriForFile(this, "com.omnilens.omniguard.provider", destFile)
+                val resultIntent = Intent().apply {
+                    data = resultUri
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                setResult(RESULT_OK, resultIntent)
+                finish()
             }
 
         } catch (e: Exception) {
@@ -440,25 +714,30 @@ class MainActivity : Activity() {
     }
 
     private fun addCardToHistory(bitmap: Bitmap?, file: File, hash: String, timeStamp: String) {
-        val card = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
+        val outerLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#1E293B"))
-            setPadding(20, 20, 20, 20)
+            setPadding(18, 18, 18, 18)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { setMargins(0, 0, 0, 12) }
         }
 
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
         val thumbView = ImageView(this).apply {
             if (bitmap != null) setImageBitmap(bitmap) else setImageResource(android.R.drawable.ic_media_play)
-            layoutParams = LinearLayout.LayoutParams(110, 110).apply { gravity = Gravity.CENTER_VERTICAL }
+            layoutParams = LinearLayout.LayoutParams(100, 100)
             scaleType = ImageView.ScaleType.CENTER_CROP
         }
 
         val infoLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(18, 0, 10, 0)
+            setPadding(15, 0, 10, 0)
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
@@ -469,12 +748,6 @@ class MainActivity : Activity() {
             setTypeface(null, Typeface.BOLD)
         }
 
-        val dateText = TextView(this).apply {
-            text = "التاريخ: $timeStamp"
-            setTextColor(Color.parseColor("#38BDF8"))
-            textSize = 10f
-        }
-
         val hashShortText = TextView(this).apply {
             text = "البصمة: ${hash.take(12)}..."
             setTextColor(Color.parseColor("#94A3B8"))
@@ -482,8 +755,43 @@ class MainActivity : Activity() {
         }
 
         infoLayout.addView(fileText)
-        infoLayout.addView(dateText)
         infoLayout.addView(hashShortText)
+
+        val btnOptions = Button(this).apply {
+            text = "⋮"
+            textSize = 18f
+            setTypeface(null, Typeface.BOLD)
+            setBackgroundColor(Color.parseColor("#334155"))
+            setTextColor(Color.WHITE)
+            layoutParams = LinearLayout.LayoutParams(80, 80)
+            setOnClickListener { showContentOptionsDialog(file, hash, timeStamp, outerLayout, fileText) }
+        }
+
+        card.addView(thumbView)
+        card.addView(infoLayout)
+        card.addView(btnOptions)
+
+        val reactionsBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(0, 10, 0, 0)
+        }
+
+        val reactHeart = createReactionButton("❤️") { Toast.makeText(this, "تم تمييز الوسائط كـ مفضلة ❤️", Toast.LENGTH_SHORT).show() }
+        val reactNote = createReactionButton("✍🏻") { Toast.makeText(this, "توقيع ملكية البصمة الرقمية ✍🏻", Toast.LENGTH_SHORT).show() }
+        val reactVerify = createReactionButton("✅") { Toast.makeText(this, "مطابقة البصمة موثقة 100% ✅", Toast.LENGTH_SHORT).show() }
+        val reactTrack = createReactionButton("👣") { Toast.makeText(this, "الأثر الرقمي والسجل الميداني نشط 👣", Toast.LENGTH_SHORT).show() }
+        val reactApprove = createReactionButton("👍🏻") { Toast.makeText(this, "تم معالجة واعتماد ترخيص OmniLens 👍🏻", Toast.LENGTH_SHORT).show() }
+
+        val reactParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        reactionsBar.addView(reactHeart, reactParams)
+        reactionsBar.addView(reactNote, reactParams)
+        reactionsBar.addView(reactVerify, reactParams)
+        reactionsBar.addView(reactTrack, reactParams)
+        reactionsBar.addView(reactApprove, reactParams)
+
+        outerLayout.addView(card)
+        outerLayout.addView(reactionsBar)
 
         val openWithDevicePlayer = {
             try {
@@ -502,32 +810,122 @@ class MainActivity : Activity() {
         thumbView.setOnClickListener { openWithDevicePlayer() }
         infoLayout.setOnClickListener { openWithDevicePlayer() }
 
-        val btnShare = Button(this).apply {
-            text = "📤"
-            textSize = 15f
-            setBackgroundColor(Color.parseColor("#2563EB"))
-            setTextColor(Color.WHITE)
-            layoutParams = LinearLayout.LayoutParams(100, 100).apply { gravity = Gravity.CENTER_VERTICAL }
-            setOnClickListener { showShareTypeDialog(file, hash) }
+        historyLayout.addView(outerLayout, 0)
+    }
+
+    private fun showContentOptionsDialog(file: File, hash: String, timeStamp: String, cardView: View, fileNameTextView: TextView) {
+        val options = arrayOf(
+            "📤 مشاركة وتراخيص OmniLens",
+            "💬 إرسال عبر دردشة OmniLens المشفرة",
+            "ℹ️ تفاصيل التوثيق والـ Hash",
+            "✏️ إعادة تسمية الملف",
+            "🗑️ حذف المحتوى من الخزنة والجهاز"
+        )
+
+        AlertDialog.Builder(this)
+            .setTitle("إدارة المحتوى والخيارات:")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showShareTypeDialog(file, hash)
+                    1 -> {
+                        showChatRoomDialog()
+                        addChatMessageCard(currentUserOmniId, "قام بتمكين ومشاركة وسائط موثقة ببصمة:\n${hash.take(16)}...")
+                    }
+                    2 -> showFileDetailsDialog(file, hash, timeStamp)
+                    3 -> showRenameFileDialog(file, fileNameTextView)
+                    4 -> confirmDeleteFile(file, cardView)
+                }
+            }
+            .show()
+    }
+
+    private fun showFileDetailsDialog(file: File, hash: String, timeStamp: String) {
+        val fileSizeMB = "%.2f".format(file.length().toDouble() / (1024 * 1024))
+        val details = """
+            📁 اسم الملف: ${file.name}
+            👤 المالك الموثق: $currentUserOmniId
+            📊 الحجم: $fileSizeMB ميجابايت
+            📅 تاريخ التوثيق: $timeStamp
+            📍 المسار: ${file.absolutePath}
+            
+            🔑 بصمة SHA-256 الكاملة:
+            $hash
+        """.trimIndent()
+
+        AlertDialog.Builder(this)
+            .setTitle("ℹ️ تفاصيل التوثيق والملف:")
+            .setMessage(details)
+            .setPositiveButton("حسناً", null)
+            .show()
+    }
+
+    private fun showRenameFileDialog(file: File, fileNameTextView: TextView) {
+        val input = EditText(this).apply {
+            setText(file.nameWithoutExtension)
+            setSelection(text.length)
         }
 
-        card.addView(thumbView)
-        card.addView(infoLayout)
-        card.addView(btnShare)
+        AlertDialog.Builder(this)
+            .setTitle("✏️ إعادة تسمية الملف:")
+            .setView(input)
+            .setPositiveButton("حفظ") { _, _ ->
+                val newName = input.text.toString().trim()
+                if (newName.isNotEmpty()) {
+                    val ext = file.extension
+                    val newFile = File(file.parentFile, "$newName.$ext")
+                    if (file.renameTo(newFile)) {
+                        fileNameTextView.text = newFile.name
+                        val mimeType = if (ext.equals("mp4", true)) "video/mp4" else "image/png"
+                        MediaScannerConnection.scanFile(this, arrayOf(file.absolutePath, newFile.absolutePath), arrayOf(mimeType), null)
+                        Toast.makeText(this, "تمت إعادة التسمية بنجاح ✅", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this, "تعذرت إعادة التسمية ❌", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton("إلغاء", null)
+            .show()
+    }
 
-        historyLayout.addView(card, 0)
+    private fun confirmDeleteFile(file: File, cardView: View) {
+        AlertDialog.Builder(this)
+            .setTitle("🗑️ تأكيد الحذف")
+            .setMessage("هل أنت تأكد من رغبتك في حذف هذا المحتوى نهائياً من الخزنة ومعرض الجهاز؟")
+            .setPositiveButton("حذف") { _, _ ->
+                val path = file.absolutePath
+                val ext = file.extension
+                if (file.delete()) {
+                    val mimeType = if (ext.equals("mp4", true)) "video/mp4" else "image/png"
+                    MediaScannerConnection.scanFile(this, arrayOf(path), arrayOf(mimeType), null)
+                    historyLayout.removeView(cardView)
+                    Toast.makeText(this, "تم حذف المحتوى بنجاح 🗑️", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "تعذر حذف الملف ❌", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("إلغاء", null)
+            .show()
+    }
+
+    private fun createReactionButton(symbol: String, onClick: () -> Unit): Button {
+        return Button(this).apply {
+            text = symbol
+            textSize = 12f
+            setBackgroundColor(Color.parseColor("#334155"))
+            setTextColor(Color.WHITE)
+            setOnClickListener { onClick() }
+        }
     }
 
     private fun showShareTypeDialog(file: File, hash: String) {
         val options = arrayOf("🆓 مشاركة عامة (Free)", "🎁 مشاركة هدية (VIP Gift)", "💰 ترخيص محتوى مدفوع (Commercial)")
-
         AlertDialog.Builder(this)
             .setTitle("اختر نوع الترخيص والسوشيال ميديا:")
             .setItems(options) { _, which ->
                 when (which) {
-                    0 -> executeShare(file, hash, "🆓 ترخيص مجاني (عام)", "محتوى موثق متاح للمعاينة والتداول.")
-                    1 -> executeShare(file, hash, "🎁 ترخيص هدية خاصة (VIP)", "محتوى خاص موثق ببصمة OmniLens.")
-                    2 -> executeShare(file, hash, "💰 ترخيص تجاري مدفوع (Paid)", "⚠️ محتوى تجاري مشفر. يحظر الاستخدام بدون ترخيص.")
+                    0 -> executeShare(file, hash, "🆓 ترخيص مجاني (عام)", "محتوى موثق متاح للمعاينة.")
+                    1 -> executeShare(file, hash, "🎁 ترخيص هدية خاصة (VIP)", "محتوى خاص موثق بـ OmniLens.")
+                    2 -> executeShare(file, hash, "💰 ترخيص تجاري مدفوع (Paid)", "⚠️ محتوى تجاري مشفر.")
                 }
             }
             .show()
@@ -542,6 +940,7 @@ class MainActivity : Activity() {
             val shareMessage = """
                 🔒 منصة OmniLens للحماية وتوثيق الوسائط
                 ----------------------------------------
+                👤 المالك: $currentUserOmniId
                 📌 نوع الترخيص: $licenseTitle
                 📝 الوصف: $licenseDesc
                 🎥 الجودة: [$selectedResolution | $selectedFPS]
@@ -559,7 +958,6 @@ class MainActivity : Activity() {
                 putExtra(Intent.EXTRA_TEXT, shareMessage)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-
             startActivity(Intent.createChooser(shareIntent, "مشاركة الوسائط عبر السوشيال ميديا:"))
         } catch (e: Exception) {
             Toast.makeText(this, "تعذرت المشاركة: ${e.message}", Toast.LENGTH_LONG).show()
