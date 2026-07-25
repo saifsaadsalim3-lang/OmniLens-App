@@ -8,22 +8,21 @@
     <application
         android:allowBackup="true"
         android:label="OmniLens"
-        android:icon="@mipmap/ic_launcher" 
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:icon="@android:drawable/sym_def_app_icon"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
-        <!-- 🚀 1. الواجهة الرئيسية (تضمن ظهور التطبيق في قائمة الهاتف) -->
+        <!-- 🚀 الواجهة الرئيسية (تضمن ظهور التطبيق في شاشة الهاتف) -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" /> <!-- 👈 هذا السطر هو الذي يظهر الشعار بالقائمة -->
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- 🛡️ 2. FileProvider للمشاركة (الذي أضفناه سابقاً) -->
+        <!-- 🛡️ FileProvider للمشاركة -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
