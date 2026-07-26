@@ -17,7 +17,7 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    // 🎯 تخصيص اسم ملف الـ APK المخرج ليكون باسم OmniLens وإصداره تلقائياً
+    // 🎯 الكود المسؤول عن إصلاح وتحديد اسم ملف الـ APK الناتج تلقائياً
     applicationVariants.all { variant ->
         variant.outputs.all {
             outputFileName = "OmniLens-v${variant.versionName}.apk"
