@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.provider.ContactsContract
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import com.omnilens.omniguard.security.OmniWatermarkEngine
@@ -17,6 +18,8 @@ import java.io.FileOutputStream
 class ShareMediaActivity : AppCompatActivity() {
 
     private var imageUriToShare: Uri? = null
+    private var selectedLicenseType: String = "ترخيص تجاري مدفوع"
+    private var isPrivateModeSelected: Boolean = false
 
     // اختيار جهة الاتصال لاستخراج الهاتف والإيميل
     private val selectContactLauncher = registerForActivityResult(
@@ -30,16 +33,68 @@ class ShareMediaActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // استقبال URI الصورة المراد توثيقها ومشاركتها
+
         imageUriToShare = intent.getParcelableExtra(Intent.EXTRA_STREAM)
 
         if (imageUriToShare != null) {
-            openContactPicker()
+            showModeSelectionDialog()
         } else {
             Toast.makeText(this, "لم يتم تحديد أي صورة للمشاركة", Toast.LENGTH_SHORT).show()
             finish()
         }
+    }
+
+    /**
+     * 1. نافذة اختيار نمط التوثيق (مدفوع / مهدى / ملكية خاصة)
+     */
+    private fun showModeSelectionDialog() {
+        val modes = arrayOf(
+            "🟢 ترخيص تجاري مدفوع",
+            "🔵 إهداء خاص",
+            "🔴 ملكية خاصة (يمنع النشر)"
+        )
+
+        AlertDialog.Builder(this)
+            .setTitle("اختر نوع توثيق المحتوى")
+            .setItems(modes) { _, which ->
+                when (which) {
+                    0 -> {
+                        selectedLicenseType = "ترخيص تجاري مدفوع"
+                        isPrivateModeSelected = false
+                        openContactPicker()
+                    }
+                    1 -> {
+                        selectedLicenseType = "إهداء خاص"
+                        isPrivateModeSelected = false
+                        openContactPicker()
+                    }
+                    2 -> {
+                        selectedLicenseType = "ملكية خاصة (يمنع النشر)"
+                        isPrivateModeSelected = true
+                        showPrivateModeNoticeDialog()
+                    }
+                }
+            }
+            .setNegativeButton("إلغاء") { _, _ -> finish() }
+            .setCancelable(false)
+            .show()
+    }
+
+    /**
+     * 2. نافذة التنبيه الخاصة بنمط الملكية الخاصة (Candor Check Dialog)
+     */
+    private fun showPrivateModeNoticeDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("⚠️ تنبيه مهم للملكية الخاصة")
+            .setMessage("سيتم طباعة بياناتك كمالك أصلي (رقم الهاتف والبريد الإلكتروني) على الشريط التحذيري لتأكيد ملكيتك وحمايتها من التداول.")
+            .setPositiveButton("موافق ومتابعة") { _, _ ->
+                openContactPicker()
+            }
+            .setNegativeButton("تراجع") { _, _ ->
+                showModeSelectionDialog()
+            }
+            .setCancelable(false)
+            .show()
     }
 
     private fun openContactPicker() {
@@ -57,7 +112,7 @@ class ShareMediaActivity : AppCompatActivity() {
                 val idIndex = it.getColumnIndex(ContactsContract.Contacts._ID)
                 val contactId = it.getString(idIndex)
 
-                // 1. استخراج رقم الهاتف
+                // 1. استخراج الهاتف
                 val hasPhoneIndex = it.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER)
                 val hasPhone = it.getString(hasPhoneIndex)
                 if (hasPhone == "1") {
@@ -93,30 +148,23 @@ class ShareMediaActivity : AppCompatActivity() {
             }
         }
 
-        // معالجة الصورة وتوثيقها بشرائط OmniLens
         processAndSendCertifiedImage(phone, email)
     }
 
-    private fun processAndSendCertifiedImage(
-        phone: String,
-        email: String,
-        licenseType: String = "ترخيص تجاري مدفوع",
-        isPrivateMode: Boolean = false
-    ) {
+    private fun processAndSendCertifiedImage(phone: String, email: String) {
         try {
             val inputStream = contentResolver.openInputStream(imageUriToShare!!)
             val originalBitmap = BitmapFactory.decodeStream(inputStream)
 
-            // توليد الصورة الموثقة بختم OmniLens الموحد
+            // توليد الصورة بالنمط والمواصفات المحددة
             val certifiedBitmap = OmniWatermarkEngine.createCertifiedImage(
                 originalBitmap = originalBitmap,
                 recipientPhone = phone,
                 recipientEmail = email,
-                licenseType = licenseType,
-                isPrivateMode = isPrivateMode
+                licenseType = selectedLicenseType,
+                isPrivateMode = isPrivateModeSelected
             )
 
-            // حفظ الصورة المؤقتة للمشاركة عبر FileProvider
             val cachePath = File(cacheDir, "shared_images")
             cachePath.mkdirs()
             val file = File(cachePath, "omnilens_certified_${System.currentTimeMillis()}.png")
@@ -130,7 +178,6 @@ class ShareMediaActivity : AppCompatActivity() {
                 file
             )
 
-            // فتح قائمة المشاركة المباشرة (WhatsApp / Telegram / إلخ)
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "image/png"
                 putExtra(Intent.EXTRA_STREAM, contentUri)
