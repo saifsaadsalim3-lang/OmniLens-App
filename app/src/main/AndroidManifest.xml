@@ -1,21 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- أذونات الوصول المباشر لقراءة جهات الاتصال والصور -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+
     <application
         android:allowBackup="true"
         android:icon="@drawable/app_icon"
         android:roundIcon="@drawable/app_icon"
         android:label="OmniLens"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
-        <!-- 1. تسجيل واجهة مشاركة المحتوى الموثق -->
+        <!-- واجهة التوثيق والمشاركة المباشرة -->
         <activity
             android:name=".ui.ShareMediaActivity"
-            android:exported="false"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+            android:exported="true"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+            
+            <!-- 1. دعم الفتح المباشر كـ Launcher من الشاشة الرئيسية -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
 
-        <!-- 2. تسجيل مزود الملفات للمشاركة الآمنة -->
+            <!-- 2. دعم استقبال الصور من المعرض عبر زر المشاركة Share -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+        </activity>
+
+        <!-- مزود الملفات للمشاركة الآمنة مع التطبيقات الخارجية -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
