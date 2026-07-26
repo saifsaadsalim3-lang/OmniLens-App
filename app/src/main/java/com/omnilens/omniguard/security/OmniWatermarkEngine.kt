@@ -12,8 +12,7 @@ import java.security.MessageDigest
 object OmniWatermarkEngine {
 
     /**
-     * دالة توليد الصورة الموثقة بشريط OmniLens الذكي
-     * تدعم الحالات الثلاث: (مدفوع / إهداء / ملكية خاصة)
+     * دالة توليد الصورة الموثقة بشريط OmniLens الموحد
      */
     fun createCertifiedImage(
         originalBitmap: Bitmap,
@@ -29,21 +28,21 @@ object OmniWatermarkEngine {
         val bannerHeight = (height * 0.14f).toInt().coerceAtLeast(140)
         val totalHeight = height + bannerHeight
 
-        // 2. إنشاء المساحة الكاملة للصورة + الشريط السفلي
+        // 2. إنشاء المساحة الكلية للصورة + الشريط
         val certifiedBitmap = Bitmap.createBitmap(width, totalHeight, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(certifiedBitmap)
 
         // 3. رسم الصورة الأصلية
         canvas.drawBitmap(originalBitmap, 0f, 0f, null)
 
-        // 4. رسم خلفية الشريط السفلي (داكنة أنيقة)
+        // 4. رسم خلفية الشريط السفلي (#1A1A1E)
         val bannerPaint = Paint().apply {
             color = Color.parseColor("#1A1A1E")
             style = Paint.Style.FILL
         }
         canvas.drawRect(RectF(0f, height.toFloat(), width.toFloat(), totalHeight.toFloat()), bannerPaint)
 
-        // 5. رسم الخط الفاصل (ذهبي للمدفوع والمهدى / أحمر ياقوتي للخاصة)
+        // 5. رسم الخط الفاصل (ذهبي للمدفع والمهدى / أحمر للخاصة)
         val borderPaint = Paint().apply {
             color = if (isPrivateMode) Color.parseColor("#C0392B") else Color.parseColor("#D4AF37")
             strokeWidth = (height * 0.005f).coerceAtLeast(4f)
@@ -71,7 +70,7 @@ object OmniWatermarkEngine {
         // 7. حساب بصمة SHA-256
         val imageHash = generateSHA256(originalBitmap)
 
-        // 8. كتابة النصوص داخل الشريط السفلي
+        // 8. كتابة النصوص
         val paddingX = width * 0.04f
         var currentY = height + (bannerHeight * 0.28f)
 
@@ -84,7 +83,7 @@ object OmniWatermarkEngine {
         val recipientDetails = "👤 $ownerLabel: $recipientPhone | ✉️ $recipientEmail | 📌 $licenseType"
         canvas.drawText(recipientDetails, paddingX, currentY, detailPaint)
 
-        // السطر الثالث: بصمة التشفير الجنائية
+        // السطر الثالث: بصمة SHA-256
         currentY += bannerHeight * 0.22f
         val shortHash = if (imageHash.length > 32) "${imageHash.substring(0, 32)}..." else imageHash
         canvas.drawText("🔑 SHA-256: $shortHash", paddingX, currentY, hashPaint)
