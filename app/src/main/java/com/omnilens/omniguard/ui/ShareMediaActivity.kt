@@ -21,6 +21,18 @@ class ShareMediaActivity : AppCompatActivity() {
     private var selectedLicenseType: String = "ترخيص تجاري مدفوع"
     private var isPrivateModeSelected: Boolean = false
 
+    // اختيار صورة من المعرض عند فتح التطبيق مباشرة من الأيقونة
+    private val pickImageLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            imageUriToShare = uri
+            showModeSelectionDialog()
+        } else {
+            finish()
+        }
+    }
+
     // اختيار جهة الاتصال لاستخراج الهاتف والإيميل
     private val selectContactLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -28,24 +40,32 @@ class ShareMediaActivity : AppCompatActivity() {
         if (result.resultCode == RESULT_OK && result.data != null) {
             val contactData: Uri? = result.data?.data
             contactData?.let { extractContactInfoAndShare(it) }
+        } else {
+            finish()
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        imageUriToShare = intent.getParcelableExtra(Intent.EXTRA_STREAM)
-
-        if (imageUriToShare != null) {
-            showModeSelectionDialog()
-        } else {
-            Toast.makeText(this, "لم يتم تحديد أي صورة للمشاركة", Toast.LENGTH_SHORT).show()
-            finish()
+        // 1. حالة مشاركة صورة من معرض الهاتف
+        if (intent?.action == Intent.ACTION_SEND && intent.type?.startsWith("image/") == true) {
+            imageUriToShare = intent.getParcelableExtra(Intent.EXTRA_STREAM)
+            if (imageUriToShare != null) {
+                showModeSelectionDialog()
+            } else {
+                Toast.makeText(this, "تعذر قراءة الصورة المشاركة", Toast.LENGTH_SHORT).show()
+                finish()
+            }
+        } 
+        // 2. حالة فتح التطبيق مباشرة من الشاشة الرئيسية
+        else {
+            pickImageLauncher.launch("image/*")
         }
     }
 
     /**
-     * 1. نافذة اختيار نمط التوثيق (مدفوع / مهدى / ملكية خاصة)
+     * نافذة اختيار نمط التوثيق
      */
     private fun showModeSelectionDialog() {
         val modes = arrayOf(
@@ -55,7 +75,7 @@ class ShareMediaActivity : AppCompatActivity() {
         )
 
         AlertDialog.Builder(this)
-            .setTitle("اختر نوع توثيق المحتوى")
+            .setTitle("OmniLens — اختر نوع التوثيق")
             .setItems(modes) { _, which ->
                 when (which) {
                     0 -> {
@@ -81,7 +101,7 @@ class ShareMediaActivity : AppCompatActivity() {
     }
 
     /**
-     * 2. نافذة التنبيه الخاصة بنمط الملكية الخاصة (Candor Check Dialog)
+     * نافذة التنبيه المخصصة لنمط الملكية الخاصة (UX Notice)
      */
     private fun showPrivateModeNoticeDialog() {
         AlertDialog.Builder(this)
@@ -112,7 +132,7 @@ class ShareMediaActivity : AppCompatActivity() {
                 val idIndex = it.getColumnIndex(ContactsContract.Contacts._ID)
                 val contactId = it.getString(idIndex)
 
-                // 1. استخراج الهاتف
+                // 1. استخراج رقم الهاتف
                 val hasPhoneIndex = it.getColumnIndex(ContactsContract.Contacts.HAS_PHONE_NUMBER)
                 val hasPhone = it.getString(hasPhoneIndex)
                 if (hasPhone == "1") {
@@ -156,7 +176,6 @@ class ShareMediaActivity : AppCompatActivity() {
             val inputStream = contentResolver.openInputStream(imageUriToShare!!)
             val originalBitmap = BitmapFactory.decodeStream(inputStream)
 
-            // توليد الصورة بالنمط والمواصفات المحددة
             val certifiedBitmap = OmniWatermarkEngine.createCertifiedImage(
                 originalBitmap = originalBitmap,
                 recipientPhone = phone,
