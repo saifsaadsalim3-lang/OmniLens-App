@@ -1,14 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
-<paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- التخزين الخارجي العام -->
-    <external-path name="external_files" path="." />
-    <!-- التخزين الخارجي الخاص بالتطبيق -->
-    <external-files-path name="external_files_path" path="." />
-    <!-- ذاكرة التخزين المؤقت (Cache) -->
-    <cache-path name="cache_files" path="." />
-    <external-cache-path name="external_cache_files" path="." />
-    <!-- التخزين الداخلي الخاص بالتطبيق -->
-    <files-path name="internal_files" path="." />
-    <!-- المسار الرئيسي للجهاز (حل شامل لكافة المسارات) -->
-    <root-path name="root" path="." />
-</paths>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.OmniGuard">
+
+        <!-- 1. تسجيل واجهة مشاركة المحتوى الموثق بجهات الاتصال -->
+        <activity
+            android:name=".ui.ShareMediaActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.Translucent" />
+
+        <!-- 2. تسجيل مزود الملفات لتمرير الصور للمشاركات الخارجية (واتساب / تليغرام) بأمان -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+    </application>
+
+</manifest>
