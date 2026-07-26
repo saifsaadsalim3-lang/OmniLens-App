@@ -1,51 +1,49 @@
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
 }
 
 android {
-    namespace = "com.omnilens.omniguard"
-    compileSdk = 34
+    namespace 'com.omnilens.omniguard'
+    compileSdk 34
 
     defaultConfig {
-        applicationId = "com.omnilens.omniguard"
-        minSdk = 24
-        targetSdk = 34
+        applicationId "com.omnilens.omniguard"
+        minSdk 21
+        targetSdk 34
+        versionCode 19
+        versionName "1.9.1"
 
-        // 🚀 زيادة رقم الإصدار لضمان التحديث المباشر بدون مسح التطبيق
-        versionCode = 2
-        versionName = "1.9.1"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    // 🎯 تخصيص اسم ملف الـ APK المخرج ليكون باسم OmniLens وإصداره تلقائياً
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            outputFileName = "OmniLens-v${variant.versionName}.apk"
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
-
+    
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }
-
+    
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = '1.8'
     }
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("com.google.android.material:material:1.11.0")
-    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
-
-    testImplementation("junit:junit:4.13.2")
-    androidTestImplementation("androidx.test.ext:junit:1.1.5")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.activity:activity-ktx:1.8.2'
 }
