@@ -3,17 +3,16 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
-        android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:icon="@android:drawable/sym_def_app_icon"
+        android:label="OmniLens"
         android:supportsRtl="true"
-        android:theme="@style/Theme.OmniGuard">
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
-        <!-- 1. تسجيل واجهة مشاركة المحتوى الموثق -->
+        <!-- 1. تسجيل واجهة مشاركة المحتوى الموثق بثيم شفاف افتراضي -->
         <activity
             android:name=".ui.ShareMediaActivity"
             android:exported="false"
-            android:theme="@style/Theme.AppCompat.Translucent" />
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <!-- 2. تسجيل مزود الملفات للمشاركة الآمنة عبر التطبيقات -->
         <provider
