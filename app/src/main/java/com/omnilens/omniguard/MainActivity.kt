@@ -14,6 +14,9 @@ import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.concurrent.thread
 
+// 🎯 استيراد كلاس الموارد الصريح للربط المباشر بالواجهة وإلغاء الشاشة السوداء
+import com.omnilens.omniguard.R
+
 class MainActivity : AppCompatActivity() {
 
     private val REQUEST_IMAGE_CAPTURE = 1001
@@ -23,15 +26,12 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // 🎯 ربط الواجهة ديناميكياً لمنع خطأ Unresolved reference: layout نهائياً
-        val layoutId = resources.getIdentifier("activity_main", "layout", packageName)
-        if (layoutId != 0) {
-            setContentView(layoutId)
-        }
+        // 💡 عرض واجهة التطبيق الأساسية مباشرة عند الفتح
+        setContentView(R.layout.activity_main)
     }
 
     /**
-     * 1️⃣ التقاط الصور بالكاميرا بدون أخطاء صلاحيات
+     * 1️⃣ التقاط الصور بالكاميرا
      */
     fun launchPhotoCamera(view: View? = null) {
         try {
