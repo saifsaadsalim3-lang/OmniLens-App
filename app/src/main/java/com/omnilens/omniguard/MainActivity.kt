@@ -34,8 +34,9 @@ class MainActivity : AppCompatActivity() {
     private val REQUEST_CAMERA_CAPTURE = 1002
     private val REQUEST_GALLERY_PICK = 1001
 
-    // قائمة القطاعات التخصصية
+    // قائمة القطاعات التخصصية مدمج بها بوابة المشاهير
     private val sectors = arrayOf(
+        "🌟 بوابة المشاهير والعقود المدفوعة (Celebrity & Escrow Hub)",
         "⚽ القطاع الرياضي والفعاليات (Sports & Events)",
         "📰 الصحافة والإعلام (Journalism & Press)",
         "🏥 القطاع الطبي والصحي (Medical & Health)",
@@ -45,7 +46,7 @@ class MainActivity : AppCompatActivity() {
         "🎓 القطاع الأكاديمي والبحثي (Academic & Research)"
     )
 
-    // مستويات التراخيص
+    // مستويات التراخيص الأربعة
     private val licenseTiers = arrayOf(
         "🟢 ترخيص تجاري مدفوع (Commercial License)",
         "🔵 إهداء خاص (Private Gift)",
@@ -75,7 +76,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             val descTv = TextView(this).apply {
-                text = "المحرك الشامل للتشفير والتوثيق المخصص للأصول الرقمية:"
+                text = "منظومة التوثيق الرقمي المزدوجة (In-App & Out-of-App Verification):"
                 textSize = 13f
                 setTextColor(Color.parseColor("#94A3B8"))
                 setPadding(0, 0, 0, 40)
@@ -105,7 +106,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             val sectionCategoryTitle = TextView(this).apply {
-                text = "🏷️ القطاعات التخصصية المعتمدة"
+                text = "🏷️ القطاعات التخصصية وبوابة العقود"
                 textSize = 15f
                 setTextColor(Color.parseColor("#38BDF8"))
                 typeface = Typeface.DEFAULT_BOLD
@@ -123,6 +124,9 @@ class MainActivity : AppCompatActivity() {
             sectors.forEachIndexed { index, sectorName ->
                 val btnSector = Button(this).apply {
                     text = sectorName
+                    if (index == 0) {
+                        setBackgroundColor(Color.parseColor("#0284C7")) // تمييز زر بوابة المشاهير
+                    }
                     setOnClickListener { startDocumentationFlow(index) }
                 }
                 rootLayout.addView(btnSector)
@@ -171,45 +175,45 @@ class MainActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle("اختر نوع الترخيص — ${sectors[sectorIndex].split("(")[0]}")
             .setItems(licenseTiers) { _, tierIndex ->
-                promptCustomMetadataDialog(sectorIndex, tierIndex)
+                promptEscrowMetadataDialog(sectorIndex, tierIndex)
             }
             .setNegativeButton("إلغاء", null)
             .show()
     }
 
-    private fun promptCustomMetadataDialog(sectorIndex: Int, tierIndex: Int) {
+    private fun promptEscrowMetadataDialog(sectorIndex: Int, tierIndex: Int) {
         val dialogLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(50, 40, 50, 20)
         }
 
         val etOwnerName = EditText(this).apply {
-            hint = "اسم المصور / المالك (مثال: سيف سعد)"
+            hint = "اسم المشهور / الموثق الاصلي"
             setText("سيف سعد سليم")
         }
 
-        val etContractId = EditText(this).apply {
-            hint = "رقم الترخيص / العقد (اختياري: LIC-2026-X)"
+        val etBuyerName = EditText(this).apply {
+            hint = "اسم المشتري / العميل المرخص له"
         }
 
-        val etCustomNote = EditText(this).apply {
-            hint = "ملاحظات إضافية / اسم الجهة (اختياري)"
+        val etContractId = EditText(this).apply {
+            hint = "رقم العقد المالي / Escrow ID (مثال: ESC-99402)"
         }
 
         dialogLayout.addView(etOwnerName)
+        dialogLayout.addView(etBuyerName)
         dialogLayout.addView(etContractId)
-        dialogLayout.addView(etCustomNote)
 
         AlertDialog.Builder(this)
-            .setTitle("بيانات التوثيق المخصصة")
+            .setTitle("عقد التوثيق والترخيص المالي")
             .setView(dialogLayout)
-            .setPositiveButton("اعتماد وتوثيق") { _, _ ->
+            .setPositiveButton("ختم وتوثيق الصورة") { _, _ ->
                 val ownerName = etOwnerName.text.toString().ifBlank { "سيف سعد سليم" }
-                val contractId = etContractId.text.toString().ifBlank { "N/A" }
-                val customNote = etCustomNote.text.toString()
+                val buyerName = etBuyerName.text.toString().ifBlank { "عميل معتمد" }
+                val contractId = etContractId.text.toString().ifBlank { "ESC-2026-DIRECT" }
 
                 currentImageUri?.let { uri ->
-                    processAndDrawWatermark(uri, sectorIndex, tierIndex, ownerName, contractId, customNote)
+                    processAndDrawWatermark(uri, sectorIndex, tierIndex, ownerName, buyerName, contractId)
                 }
             }
             .setNegativeButton("إلغاء", null)
@@ -221,8 +225,8 @@ class MainActivity : AppCompatActivity() {
         sectorIndex: Int,
         tierIndex: Int,
         ownerName: String,
-        contractId: String,
-        customNote: String
+        buyerName: String,
+        contractId: String
     ) {
         try {
             val inputStream = contentResolver.openInputStream(imageUri)
@@ -234,8 +238,7 @@ class MainActivity : AppCompatActivity() {
                 return
             }
 
-            // زيادة ارتفاع الشريط ليستوعب البيانات المخصصة
-            val bannerHeight = (originalBitmap.height * 0.16f).coerceAtLeast(200f).toInt()
+            val bannerHeight = (originalBitmap.height * 0.17f).coerceAtLeast(210f).toInt()
             val newBitmap = Bitmap.createBitmap(
                 originalBitmap.width,
                 originalBitmap.height + bannerHeight,
@@ -266,35 +269,37 @@ class MainActivity : AppCompatActivity() {
             val tierTitle = licenseTiers[tierIndex].split("(")[0].trim()
             val headerText = "$sectorTitle | $tierTitle"
 
-            var detailText = "الموثق: $ownerName | العقد: $contractId"
-            if (customNote.isNotBlank()) {
-                detailText += " | $customNote"
-            }
-
             val timeStamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-            val sha256Hash = generateSHA256("$timeStamp-$sectorIndex-$tierIndex-$ownerName-${originalBitmap.width}")
+            val sha256Hash = generateSHA256("$timeStamp-$sectorIndex-$tierIndex-$ownerName-$contractId-${originalBitmap.width}")
+
+            val verifyUrl = "https://verify.omnilens.app/v/${sha256Hash.take(16)}"
+            val detailText1 = "الموثق: $ownerName | المرخص له: $buyerName"
+            val detailText2 = "العقد المالي: $contractId | رابط التحقق: $verifyUrl"
 
             val textPaint = Paint().apply {
                 color = Color.WHITE
                 isAntiAlias = true
-                textSize = bannerHeight * 0.20f
+                textSize = bannerHeight * 0.18f
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             }
 
             val startX = 35f
-            var startY = originalBitmap.height + (bannerHeight * 0.28f)
+            var startY = originalBitmap.height + (bannerHeight * 0.25f)
 
             canvas.drawText(headerText, startX, startY, textPaint)
 
-            textPaint.textSize = bannerHeight * 0.14f
+            textPaint.textSize = bannerHeight * 0.13f
             textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-            startY += bannerHeight * 0.24f
-            canvas.drawText(detailText, startX, startY, textPaint)
-
-            textPaint.textSize = bannerHeight * 0.11f
-            textPaint.color = Color.parseColor("#E2E8F0")
             startY += bannerHeight * 0.22f
-            canvas.drawText("SHA-256: ${sha256Hash.take(32)}... | Date: $timeStamp", startX, startY, textPaint)
+            canvas.drawText(detailText1, startX, startY, textPaint)
+
+            startY += bannerHeight * 0.20f
+            canvas.drawText(detailText2, startX, startY, textPaint)
+
+            textPaint.textSize = bannerHeight * 0.10f
+            textPaint.color = Color.parseColor("#E2E8F0")
+            startY += bannerHeight * 0.20f
+            canvas.drawText("SHA-256: $sha256Hash | Date: $timeStamp", startX, startY, textPaint)
 
             saveAndShareProcessedImage(newBitmap)
 
