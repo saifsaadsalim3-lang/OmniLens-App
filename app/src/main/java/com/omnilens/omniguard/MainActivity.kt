@@ -5,12 +5,14 @@ import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.*
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.text.InputType
 import android.view.Gravity
+import android.view.View
 import android.view.WindowManager
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
@@ -36,6 +38,16 @@ class MainActivity : AppCompatActivity() {
     private var activeSectorName: String = "العام"
     private var targetRecipientName: String = ""
 
+    // 🎨 لوحة الألوان السيبرانية المعتمدة (Cyber Dark Theme)
+    private val COLOR_BG = Color.parseColor("#080F1E")        // كحلي داكن جداً خلفي
+    private val COLOR_CARD = Color.parseColor("#131E36")      // بطاقات ليلية
+    private val COLOR_ACCENT = Color.parseColor("#00F0FF")    // أزرق سيبراني مضيء
+    private val COLOR_TEXT_MUTED = Color.parseColor("#8E9AAF")// نص فرعي ناعم
+    private val COLOR_FREE = Color.parseColor("#1B4332")      // أخضر غابي
+    private val COLOR_GIFT = Color.parseColor("#4A154B")      // أرجواني ملكي
+    private val COLOR_PAID = Color.parseColor("#0077B6")      // أزرق نيلي
+    private val COLOR_PRIVATE = Color.parseColor("#7F1D1D")   // أحمر أمني
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // 🛡️ الطبقة الأولى: حظر لقطات الشاشة وتسجيلها بداخل التطبيق
@@ -44,30 +56,56 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * 🏠 1️⃣ الواجهة الرئيسية والتنقل الشامل
+     * 🛠️ محرك إنشاء الخلفيات والزوايا المنحنية برمجياً (Crash-Free UI Generator)
+     */
+    private fun createDrawable(bgColor: Int, strokeColor: Int = Color.TRANSPARENT, strokeWidth: Int = 0, cornerRadius: Float = 24f): GradientDrawable {
+        return GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(bgColor)
+            setCornerRadius(cornerRadius)
+            if (strokeWidth > 0) {
+                setStroke(strokeWidth, strokeColor)
+            }
+        }
+    }
+
+    /**
+     * 🏠 1️⃣ الواجهة الرئيسية والتنقل الشامل (Polished Dashboard)
      */
     private fun showMainDashboard() {
         val scrollView = ScrollView(this).apply {
-            setBackgroundColor(Color.parseColor("#0B132B"))
+            setBackgroundColor(COLOR_BG)
             isFillViewport = true
         }
 
         val mainLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(30, 50, 30, 50)
+            setPadding(35, 50, 35, 60)
         }
+
+        // 🏷️ الهيدر الرئيسي والشارة الأمنية المتفاعلة
+        val statusPill = TextView(this).apply {
+            text = "🟢 ENGINE: ACTIVE | FLAG_SECURE: ON | FORENSICS: ACTIVE"
+            setTextColor(COLOR_ACCENT)
+            textSize = 9f
+            setTypeface(null, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            background = createDrawable(Color.parseColor("#0A2540"), COLOR_ACCENT, 2, 40f)
+            setPadding(30, 12, 30, 12)
+        }
+        mainLayout.addView(statusPill)
 
         val headerLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(0, 10, 0, 10)
+            setPadding(0, 30, 0, 10)
         }
 
         val titleText = TextView(this).apply {
             text = "منظومة OmniLens Engine v2.0"
             setTextColor(Color.WHITE)
-            textSize = 19f
+            textSize = 20f
             setTypeface(null, Typeface.BOLD)
         }
 
@@ -81,30 +119,30 @@ class MainActivity : AppCompatActivity() {
         mainLayout.addView(headerLayout)
 
         val subTitleText = TextView(this).apply {
-            text = "المحرك الموحد لتوثيق الصور والفيديوهات والتتبع الجنائي"
-            setTextColor(Color.parseColor("#8D99AE"))
+            text = "المحرك الموحد لتوثيق الوسائط والتتبع الجنائي والضمان المالي"
+            setTextColor(COLOR_TEXT_MUTED)
             textSize = 11f
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 30)
+            setPadding(0, 0, 0, 35)
         }
         mainLayout.addView(subTitleText)
 
-        // 📸 الكاميرا الميدانية
+        // 📸 1. الكاميرا الميدانية والتوثيق المباشر
         mainLayout.addView(createSectionHeader("📸 الكاميرا الميدانية والتوثيق المباشر"))
-        mainLayout.addView(createStyledButton("📷 التقاط صورة وتوثيقها بالبصمة", "#1C2541") { launchPhotoCamera() })
-        mainLayout.addView(createStyledButton("🎥 تصوير مقطع فيديو موثق بالبصمة", "#1C2541") { launchVideoCamera() })
-        mainLayout.addView(createStyledButton("📁 اختيار وسيط من المعرض وتوثيقه", "#1C2541") { openGallery() })
+        mainLayout.addView(createStyledButton("📷 التقاط صورة وتوثيقها بالبصمة", COLOR_CARD, COLOR_ACCENT) { launchPhotoCamera() })
+        mainLayout.addView(createStyledButton("🎥 تصوير مقطع فيديو موثق بالبصمة", COLOR_CARD, COLOR_ACCENT) { launchVideoCamera() })
+        mainLayout.addView(createStyledButton("📁 اختيار وسيط من المعرض وتوثيقه", COLOR_CARD, COLOR_ACCENT) { openGallery() })
 
-        // 💬 مركز الشات والضمان المالي (Escrow Chat)
+        // 💬 2. مركز المحادثات والضمان المالي
         mainLayout.addView(createSectionHeader("💬 التفاوض والضمان المالي (Escrow Chat)"))
-        mainLayout.addView(createStyledButton("💬 دخول مركز المحادثات والمعاينة المقفولة", "#0077B6") { openChatHub() })
+        mainLayout.addView(createStyledButton("💬 دخول مركز المحادثات والمعاينة المقفولة", COLOR_PAID, Color.WHITE) { openChatHub() })
 
-        // 🏷️ القطاعات التخصصية الثمانية
+        // 🏷️ 3. القطاعات التخصصية الثمانية
         mainLayout.addView(createSectionHeader("🏷️ القطاعات التخصصية التفاعلية"))
         val sectors = listOf(
             "🌟 بوابة المشاهير والعقود (ESCROW HUB)",
             "⚽ القطاع الرياضي والفعاليات (SPORTS)",
-            "📰 الصحافة والإعلام (PRESS)",
+            "📰 الصحافة والإعلام (PRESS & LEAKS)",
             "🏥 القطاع الطبي والصحي (MEDICAL)",
             "🎬 الإنتاج السينمائي (CINEMATIC)",
             "🎨 الفن الرقمي والتصميم (FINE ART & NFT)",
@@ -113,25 +151,25 @@ class MainActivity : AppCompatActivity() {
         )
 
         sectors.forEach { sector ->
-            mainLayout.addView(createStyledButton(sector, "#2B2D42") { openSectorPage(sector) })
+            mainLayout.addView(createSectorCard(sector) { openSectorPage(sector) })
         }
 
-        // 🔐 الخزنة المشفرة والحساب
+        // 🔐 4. الخزنة المشفرة والحساب
         mainLayout.addView(createSectionHeader("👤 الحساب والخزنة المشفرة"))
-        mainLayout.addView(createStyledButton("🔒 فتح الخزنة المشفرة (Private Vault)", "#5C4D7D") { openPrivateVault() })
-        mainLayout.addView(createStyledButton("⚙️ إعدادات الحساب والمزامنة السحابية", "#6C757D") { showAccountDialog() })
+        mainLayout.addView(createStyledButton("🔒 فتح الخزنة المشفرة (Private Vault)", COLOR_PRIVATE, Color.WHITE) { openPrivateVault() })
+        mainLayout.addView(createStyledButton("⚙️ إعدادات الحساب والمزامنة السحابية", COLOR_CARD, COLOR_TEXT_MUTED) { showAccountDialog() })
 
         scrollView.addView(mainLayout)
         setContentView(scrollView)
     }
 
     /**
-     * 🏷️ 2️⃣ شاشة القطاع التخصصي والأنماط الأربعة
+     * 🏷️ 2️⃣ شاشة القطاع التخصصي والأنماط الأربعة (Dynamic Mode Picker)
      */
     private fun openSectorPage(sectorTitle: String) {
         activeSectorName = sectorTitle
         val scrollView = ScrollView(this).apply {
-            setBackgroundColor(Color.parseColor("#0B132B"))
+            setBackgroundColor(COLOR_BG)
             isFillViewport = true
         }
 
@@ -142,8 +180,8 @@ class MainActivity : AppCompatActivity() {
 
         val title = TextView(this).apply {
             text = sectorTitle
-            setTextColor(Color.parseColor("#4CC9F0"))
-            textSize = 16f
+            setTextColor(COLOR_ACCENT)
+            textSize = 17f
             setTypeface(null, Typeface.BOLD)
             setPadding(0, 0, 0, 20)
         }
@@ -165,6 +203,8 @@ class MainActivity : AppCompatActivity() {
 
         val dynamicFormContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            background = createDrawable(COLOR_CARD, COLOR_ACCENT, 1, 20f)
+            setPadding(25, 25, 25, 25)
         }
 
         fun updateModeUI(selectedMode: LicenseMode) {
@@ -174,33 +214,34 @@ class MainActivity : AppCompatActivity() {
             when (selectedMode) {
                 LicenseMode.FREE -> {
                     dynamicFormContainer.addView(createStyledEditText("📝 وصف المادة أو التغطية المجانية", InputType.TYPE_CLASS_TEXT))
+                    val info = TextView(this).apply { text = "🟢 نمط مجاني: بدون شبكة تعتيم، مع شريط سفلي موثق باللون الأخضر الغابي."; setTextColor(COLOR_ACCENT); textSize = 11f; setPadding(0, 10, 0, 0) }
+                    dynamicFormContainer.addView(info)
                 }
                 LicenseMode.PAID -> {
                     dynamicFormContainer.addView(createStyledEditText("💵 المبلغ المالي المطلوب ($ USD)", InputType.TYPE_CLASS_NUMBER))
                     dynamicFormContainer.addView(createStyledEditText("👤 اسم المشتري / العميل", InputType.TYPE_CLASS_TEXT))
+                    val info = TextView(this).apply { text = "🔵 نمط مدفوع: النمط الشبكي المائل وحظر الاقتطاع مع شريط أزرق محيطي."; setTextColor(COLOR_ACCENT); textSize = 11f; setPadding(0, 10, 0, 0) }
+                    dynamicFormContainer.addView(info)
                 }
                 LicenseMode.GIFT -> {
                     val inputGift = createStyledEditText("🎁 اسم الشخص / الجهة المهدَى إليها", InputType.TYPE_CLASS_TEXT)
                     dynamicFormContainer.addView(inputGift)
                     targetRecipientName = inputGift.text.toString()
+                    val info = TextView(this).apply { text = "🟣 نمط هدية: بدون شبكة تعتيم، مع ختم إهداء فاخر وشريط أرجواني ملكي."; setTextColor(COLOR_ACCENT); textSize = 11f; setPadding(0, 10, 0, 0) }
+                    dynamicFormContainer.addView(info)
                 }
                 LicenseMode.PRIVATE -> {
                     dynamicFormContainer.addView(createStyledEditText("🔐 كلمة السر الخاصة بالخزنة المشفرة", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD))
-                    val info = TextView(this).apply {
-                        text = "🛡️ سيتم تطبيق النمط الشبكي الدقيق والبصمة الترددية لتتبع أي تصوير خارجي."
-                        setTextColor(Color.YELLOW)
-                        textSize = 11f
-                        setPadding(0, 10, 0, 20)
-                    }
+                    val info = TextView(this).apply { text = "🔴 نمط خاص: حماية قصوى بالنمط الشبكي الدقيق والبصمة الترددية وشريط أحمر أمني."; setTextColor(Color.YELLOW); textSize = 11f; setPadding(0, 10, 0, 0) }
                     dynamicFormContainer.addView(info)
                 }
             }
         }
 
-        val btnFree = Button(this).apply { text = "🆓 مجاني"; textSize = 10f; layoutParams = LinearLayout.LayoutParams(0, 120, 1f); setOnClickListener { updateModeUI(LicenseMode.FREE) } }
-        val btnPaid = Button(this).apply { text = "💳 مدفوع"; textSize = 10f; layoutParams = LinearLayout.LayoutParams(0, 120, 1f); setOnClickListener { updateModeUI(LicenseMode.PAID) } }
-        val btnGift = Button(this).apply { text = "🎁 هدية"; textSize = 10f; layoutParams = LinearLayout.LayoutParams(0, 120, 1f); setOnClickListener { updateModeUI(LicenseMode.GIFT) } }
-        val btnPrivate = Button(this).apply { text = "🔒 خاص"; textSize = 10f; layoutParams = LinearLayout.LayoutParams(0, 120, 1f); setOnClickListener { updateModeUI(LicenseMode.PRIVATE) } }
+        val btnFree = createModeButton("🆓 مجاني", COLOR_FREE) { updateModeUI(LicenseMode.FREE) }
+        val btnPaid = createModeButton("💳 مدفوع", COLOR_PAID) { updateModeUI(LicenseMode.PAID) }
+        val btnGift = createModeButton("🎁 هدية", COLOR_GIFT) { updateModeUI(LicenseMode.GIFT) }
+        val btnPrivate = createModeButton("🔒 خاص", COLOR_PRIVATE) { updateModeUI(LicenseMode.PRIVATE) }
 
         modeContainer.addView(btnFree)
         modeContainer.addView(btnPaid)
@@ -212,9 +253,12 @@ class MainActivity : AppCompatActivity() {
 
         updateModeUI(LicenseMode.FREE)
 
-        val btnCapturePhoto = createStyledButton("📸 التقاط صورة وتوثيقها", "#3A5A40") { launchPhotoCamera() }
-        val btnCaptureVideo = createStyledButton("🎥 تسجيل فيديو وتوثيقه", "#0077B6") { launchVideoCamera() }
-        val btnBack = createStyledButton("🔙 العودة للقائمة الرئيسية", "#6C757D") { showMainDashboard() }
+        val spacer = View(this).apply { layoutParams = LinearLayout.LayoutParams(1, 30) }
+        layout.addView(spacer)
+
+        val btnCapturePhoto = createStyledButton("📸 التقاط صورة وتوثيقها", COLOR_FREE, Color.WHITE) { launchPhotoCamera() }
+        val btnCaptureVideo = createStyledButton("🎥 تسجيل فيديو وتوثيقه", COLOR_PAID, Color.WHITE) { launchVideoCamera() }
+        val btnBack = createStyledButton("🔙 العودة للقائمة الرئيسية", COLOR_CARD, COLOR_TEXT_MUTED) { showMainDashboard() }
 
         layout.addView(btnCapturePhoto)
         layout.addView(btnCaptureVideo)
@@ -225,11 +269,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * 💬 3️⃣ الشات وبوابة الضمان المالي (Escrow Hub)
+     * 💬 3️⃣ مركز الشات والضمان المالي (Polished Escrow Hub UI)
      */
     private fun openChatHub() {
         val scrollView = ScrollView(this).apply {
-            setBackgroundColor(Color.parseColor("#0B132B"))
+            setBackgroundColor(COLOR_BG)
             isFillViewport = true
         }
 
@@ -240,8 +284,8 @@ class MainActivity : AppCompatActivity() {
 
         val title = TextView(this).apply {
             text = "💬 مركز الشات والضمان المالي (Escrow Hub)"
-            setTextColor(Color.parseColor("#4CC9F0"))
-            textSize = 16f
+            setTextColor(COLOR_ACCENT)
+            textSize = 17f
             setTypeface(null, Typeface.BOLD)
             setPadding(0, 0, 0, 20)
         }
@@ -249,33 +293,33 @@ class MainActivity : AppCompatActivity() {
 
         val cardLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#1C2541"))
-            setPadding(25, 25, 25, 25)
+            background = createDrawable(COLOR_CARD, COLOR_ACCENT, 2, 24f)
+            setPadding(30, 30, 30, 30)
         }
 
         val cardTitle = TextView(this).apply {
-            text = "🔒 صورة/فيديو موثق (معاينة مقفولة)"
+            text = "🔒 معاينة مقفولة (Locked Preview)"
             setTextColor(Color.YELLOW)
-            textSize = 13f
+            textSize = 14f
             setTypeface(null, Typeface.BOLD)
         }
         cardLayout.addView(cardTitle)
 
         val cardDesc = TextView(this).apply {
-            text = "قيمة العقد: $250 USD\nالمالك: ՏԹɿԲ. Տ. ՏԹʅɿʍ\nالحالة: المادة محمية بالنمط الشبكي الدقيق بانتظار الإيداع."
+            text = "💵 قيمة العقد: $250 USD\n👤 المالك: ՏԹɿԲ. Տ. ՏԹʅɿʍ\n🛡️ الحالة: المادة محمية بالنمط الشبكي الدقيق بانتظار إيداع الضمان."
             setTextColor(Color.WHITE)
             textSize = 11f
-            setPadding(0, 10, 0, 20)
+            setPadding(0, 15, 0, 25)
         }
         cardLayout.addView(cardDesc)
 
-        val btnDeposit = createStyledButton("💳 إيداع المبلغ بحساب الضمان (Escrow Deposit)", "#0077B6") {
+        val btnDeposit = createStyledButton("💳 إيداع المبلغ بحساب الضمان ($250 USD)", COLOR_PAID, Color.WHITE) {
             showDialog("حجز المبلغ 💳", "تم إيداع $250 USD بنجاح بداخل حساب الضمان، وفك المعاينة المقفولة للعميل.")
         }
-        val btnRelease = createStyledButton("✅ اعتماد واستلام المادة (Release Funds)", "#3A5A40") {
+        val btnRelease = createStyledButton("✅ اعتماد واستلام المادة (Release Funds)", COLOR_FREE, Color.WHITE) {
             showDialog("إفراج عن المبلغ 💸", "تم تسليم النسخة الأصلية الصافية 100% بدون شبكة تعتيم للمشتري، وتحويل المبلغ لحسابك!")
         }
-        val btnDispute = createStyledButton("⚠️ رفع نزاع مالي وتوثيقي (Open Dispute)", "#D90429") {
+        val btnDispute = createStyledButton("⚠️ رفع نزاع مالي وتوثيقي (Open Dispute)", COLOR_PRIVATE, Color.WHITE) {
             showDialog("فتح نزاع ⚠️", "تم تجميد الصفقة وتوليد تقرير الفحص الجنائي.")
         }
 
@@ -285,7 +329,10 @@ class MainActivity : AppCompatActivity() {
 
         layout.addView(cardLayout)
 
-        val btnBack = createStyledButton("🔙 العودة للقائمة الرئيسية", "#6C757D") { showMainDashboard() }
+        val spacer = View(this).apply { layoutParams = LinearLayout.LayoutParams(1, 30) }
+        layout.addView(spacer)
+
+        val btnBack = createStyledButton("🔙 العودة للقائمة الرئيسية", COLOR_CARD, COLOR_TEXT_MUTED) { showMainDashboard() }
         layout.addView(btnBack)
 
         scrollView.addView(layout)
@@ -293,12 +340,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * 🔒 4️⃣ الخزنة المشفرة (Private Vault)
+     * 🔒 4️⃣ الخزنة المشفرة (Private Vault UI)
      */
     private fun openPrivateVault() {
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#0B132B"))
+            setBackgroundColor(COLOR_BG)
             setPadding(40, 60, 40, 60)
             gravity = Gravity.CENTER
         }
@@ -306,7 +353,7 @@ class MainActivity : AppCompatActivity() {
         val vaultTitle = TextView(this).apply {
             text = "🔐 الخزنة المشفرة | Private Vault"
             setTextColor(Color.WHITE)
-            textSize = 17f
+            textSize = 18f
             setTypeface(null, Typeface.BOLD)
             gravity = Gravity.CENTER
             setPadding(0, 0, 0, 20)
@@ -315,21 +362,21 @@ class MainActivity : AppCompatActivity() {
 
         val vaultDesc = TextView(this).apply {
             text = "تضم كافة المواد الخاصة المحمية بالبصمة الترددية المخفية والنمط الشبكي الدقيق."
-            setTextColor(Color.parseColor("#8D99AE"))
+            setTextColor(COLOR_TEXT_MUTED)
             textSize = 11f
             gravity = Gravity.CENTER
-            setPadding(0, 0, 0, 30)
+            setPadding(0, 0, 0, 40)
         }
         layout.addView(vaultDesc)
 
-        val btnBack = createStyledButton("🔙 العودة للقائمة الرئيسية", "#6C757D") { showMainDashboard() }
+        val btnBack = createStyledButton("🔙 العودة للقائمة الرئيسية", COLOR_CARD, COLOR_TEXT_MUTED) { showMainDashboard() }
         layout.addView(btnBack)
 
         setContentView(layout)
     }
 
     /**
-     * 🎨 5️⃣ محرك التوثيق البصري والتلوين الميداني الديناميكي (Smart Watermark Engine)
+     * 🎨 5️⃣ محرك التوثيق البصري والتلوين الميداني الديناميكي (Watermark Engine)
      */
     private fun applyModelCWatermarkAndSave(sourceUri: Uri) {
         try {
@@ -340,11 +387,11 @@ class MainActivity : AppCompatActivity() {
             val width = mutableBitmap.width.toFloat()
             val height = mutableBitmap.height.toFloat()
 
-            // 1. تطبيق النمط الشبكي الدقيق (Micro-Grid) فقط في النمط المدفوع والخاص
+            // 1. النمط الشبكي الدقيق (Micro-Grid) فقط للمدفوع والخاص
             if (activeMode == LicenseMode.PAID || activeMode == LicenseMode.PRIVATE) {
                 val gridPaint = Paint().apply {
                     color = Color.WHITE
-                    alpha = 35 // شفافية خفيفة جداً ورائعة
+                    alpha = 35
                     textSize = width * 0.028f
                     typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
                 }
@@ -367,7 +414,7 @@ class MainActivity : AppCompatActivity() {
                 canvas.restore()
             }
 
-            // 2. ختم إهداء ناعم أنيق في حالة نمط الهدية (Gift Mode)
+            // 2. ختم الإهداء الناعم الأنيق في نمط الهدية (Gift Mode)
             if (activeMode == LicenseMode.GIFT) {
                 val giftPaint = Paint().apply {
                     color = Color.YELLOW
@@ -380,12 +427,12 @@ class MainActivity : AppCompatActivity() {
                 canvas.drawText(giftText, width / 2f, height * 0.85f, giftPaint)
             }
 
-            // 3. تحديد لون الشريط الأسفلي الميداني الملون ديناميكياً بحسب النمط
+            // 3. تحديد لون الشريط الأسفلي الميداني الملون ديناميكياً
             val bannerColorHex = when (activeMode) {
-                LicenseMode.FREE -> "#1B4332"    // أخضر غابي داكن
+                LicenseMode.FREE -> "#1B4332"    // أخضر غابي
                 LicenseMode.GIFT -> "#4A154B"    // أرجواني ملكي
-                LicenseMode.PAID -> "#0077B6"    // أزرق نيلي محيطي
-                LicenseMode.PRIVATE -> "#7F1D1D" // أحمر أمني داكن
+                LicenseMode.PAID -> "#0077B6"    // أزرق نيلي
+                LicenseMode.PRIVATE -> "#7F1D1D" // أحمر أمني
             }
 
             val bannerHeight = height * 0.10f
@@ -471,15 +518,9 @@ class MainActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode == RESULT_OK) {
             when (requestCode) {
-                REQUEST_IMAGE_CAPTURE -> {
-                    currentMediaUri?.let { uri -> applyModelCWatermarkAndSave(uri) }
-                }
-                REQUEST_VIDEO_CAPTURE -> {
-                    currentMediaUri?.let { uri -> processVideoAndSave(uri) } ?: data?.data?.let { uri -> processVideoAndSave(uri) }
-                }
-                REQUEST_GALLERY_PICK -> {
-                    data?.data?.let { uri -> applyModelCWatermarkAndSave(uri) }
-                }
+                REQUEST_IMAGE_CAPTURE -> currentMediaUri?.let { uri -> applyModelCWatermarkAndSave(uri) }
+                REQUEST_VIDEO_CAPTURE -> currentMediaUri?.let { uri -> processVideoAndSave(uri) } ?: data?.data?.let { uri -> processVideoAndSave(uri) }
+                REQUEST_GALLERY_PICK -> data?.data?.let { uri -> applyModelCWatermarkAndSave(uri) }
             }
         }
     }
@@ -533,16 +574,61 @@ class MainActivity : AppCompatActivity() {
         showDialog("👤 بروفايل المطور | ՏԹɿԲ. Տ. ՏԹʅɿʍ", "المالك والمطور الرئيسي: ՏԹɿԲ. Տ. ՏԹʅɿʍ\nمعرف المنظومة: OMNI-DEV-2026-SAIF\nحالة الحماية الجنائية: نشطة بالكامل 🟢")
     }
 
+    // 🎨 أدوات وبناء عناصر الواجهة برمجياً وبدون أخطاء
+    private fun createSectorCard(title: String, onClickAction: () -> Unit): LinearLayout {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = createDrawable(COLOR_CARD, Color.parseColor("#1F2D4A"), 1, 20f)
+            setPadding(35, 30, 35, 30)
+            setOnClickListener { onClickAction() }
+
+            val txt = TextView(context).apply {
+                text = title
+                setTextColor(Color.WHITE)
+                textSize = 12f
+                setTypeface(null, Typeface.BOLD)
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+
+            val arrow = TextView(context).apply {
+                text = "❮"
+                setTextColor(COLOR_ACCENT)
+                textSize = 14f
+            }
+
+            addView(txt)
+            addView(arrow)
+
+            val params = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            params.setMargins(0, 0, 0, 18)
+            layoutParams = params
+        }
+    }
+
+    private fun createModeButton(textStr: String, hexColor: Int, onClickAction: () -> Unit): Button {
+        return Button(this).apply {
+            text = textStr
+            textSize = 10f
+            setTextColor(Color.WHITE)
+            background = createDrawable(hexColor, Color.TRANSPARENT, 0, 16f)
+            setOnClickListener { onClickAction() }
+            val params = LinearLayout.LayoutParams(0, 110, 1f)
+            params.setMargins(4, 0, 4, 0)
+            layoutParams = params
+        }
+    }
+
     private fun createStyledEditText(hintText: String, inputTypeEnum: Int): EditText {
         return EditText(this).apply {
             hint = hintText
             inputType = inputTypeEnum
-            setHintTextColor(Color.parseColor("#8D99AE"))
+            setHintTextColor(COLOR_TEXT_MUTED)
             setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor("#1C2541"))
-            setPadding(30, 35, 30, 35)
+            background = createDrawable(COLOR_BG, COLOR_ACCENT, 1, 16f)
+            setPadding(30, 30, 30, 30)
             val params = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-            params.setMargins(0, 0, 0, 20)
+            params.setMargins(0, 0, 0, 18)
             layoutParams = params
         }
     }
@@ -550,23 +636,23 @@ class MainActivity : AppCompatActivity() {
     private fun createSectionHeader(title: String): TextView {
         return TextView(this).apply {
             text = title
-            setTextColor(Color.parseColor("#4CC9F0"))
+            setTextColor(COLOR_ACCENT)
             textSize = 12f
             setTypeface(null, Typeface.BOLD)
             gravity = Gravity.RIGHT
-            setPadding(0, 20, 10, 15)
+            setPadding(0, 25, 10, 15)
         }
     }
 
-    private fun createStyledButton(buttonText: String, hexColor: String, onClickAction: () -> Unit): Button {
+    private fun createStyledButton(buttonText: String, bgHex: Int, textHex: Int, onClickAction: () -> Unit): Button {
         return Button(this).apply {
             text = buttonText
             textSize = 12f
-            setTextColor(Color.WHITE)
-            setBackgroundColor(Color.parseColor(hexColor))
+            setTextColor(textHex)
+            background = createDrawable(bgHex, COLOR_ACCENT, 1, 20f)
             setOnClickListener { onClickAction() }
             val params = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 135)
-            params.setMargins(0, 0, 0, 15)
+            params.setMargins(0, 0, 0, 18)
             layoutParams = params
         }
     }
