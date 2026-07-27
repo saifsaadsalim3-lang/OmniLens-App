@@ -184,7 +184,8 @@ class MainActivity : AppCompatActivity() {
                     targetRecipientName = inputGift.text.toString()
                 }
                 LicenseMode.PRIVATE -> {
-                    dynamicFormContainer.addView(createStyledEditText("🔐 كلمة السر الخاصة بالخزنة المشفرة", InputType.TYPE_CLASS_PASSWORD))
+                    // تم تصحيح نوع الإدخال هنا ليتوافق مع أندرويد
+                    dynamicFormContainer.addView(createStyledEditText("🔐 كلمة السر الخاصة بالخزنة المشفرة", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD))
                     val info = TextView(this).apply {
                         text = "🛡️ سيتم تطبيق التعتيم الشفاف والبصمة المخفية للتتبع الجنائي على الصور والفيديوهات."
                         setTextColor(Color.YELLOW)
