@@ -14,7 +14,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.concurrent.thread
 
-// 🎯 استيراد كلاس الموارد الصريح للربط المباشر بالواجهة وإلغاء الشاشة السوداء
 import com.omnilens.omniguard.R
 
 class MainActivity : AppCompatActivity() {
@@ -25,14 +24,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // 💡 عرض واجهة التطبيق الأساسية مباشرة عند الفتح
+        // ربط الواجهة البرمجية بعد توفر ملف التصميم XML
         setContentView(R.layout.activity_main)
     }
 
-    /**
-     * 1️⃣ التقاط الصور بالكاميرا
-     */
     fun launchPhotoCamera(view: View? = null) {
         try {
             val photoFile = File.createTempFile("omni_img_", ".jpg", cacheDir)
@@ -49,9 +44,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * 2️⃣ تصوير مقطع فيديو موثق
-     */
     fun launchVideoCamera(view: View? = null) {
         try {
             val videoFile = File.createTempFile("omni_vid_", ".mp4", cacheDir)
@@ -69,10 +61,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * 3️⃣ نظام حساب المنصة والتحقق من الدفع المالي
-     */
-    fun checkPaymentAndEscrowStatus(contractId: String = "OMNI-CONTRACT-01") {
+    fun checkPaymentButton(view: View? = null) {
+        checkPaymentAndEscrowStatus("OMNI-CONTRACT-01")
+    }
+
+    fun checkPaymentAndEscrowStatus(contractId: String) {
         Toast.makeText(this, "جاري التحقق من عملية الدفع والعقد أونلاين...", Toast.LENGTH_SHORT).show()
 
         thread {
@@ -98,9 +91,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * 4️⃣ نافذة إضافة وإدارة حساب المنصة
-     */
     fun showAccountDialog(view: View? = null) {
         AlertDialog.Builder(this)
             .setTitle("👤 حساب المنصة | OmniLens Profile")
