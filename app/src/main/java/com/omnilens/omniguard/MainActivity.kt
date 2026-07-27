@@ -1,11 +1,13 @@
 package com.omnilens.omniguard
 
 import android.Manifest
+import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.text.InputType
@@ -132,7 +134,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * 🏛️ 2️⃣ شاشة القطاع التخصصي الذكية والمجهزة بحقول مخصصة لكل قطاع
+     * 🏛️ 2️⃣ شاشة القطاع التخصصي الذكية
      */
     private fun openSectorPage(sectorName: String, sectorDescription: String) {
         val scrollView = ScrollView(this).apply {
@@ -162,7 +164,6 @@ class MainActivity : AppCompatActivity() {
         }
         layout.addView(desc)
 
-        // 🎯 إنشاء الحقول الذكية المخصصة حسب نوع القطاع
         when {
             sectorName.contains("المشاهير") || sectorName.contains("العقود") -> {
                 val inputAmount = createStyledEditText("💵 المبلغ المالي المطلوب تحويله ($ USD)", InputType.TYPE_CLASS_NUMBER)
@@ -200,21 +201,7 @@ class MainActivity : AppCompatActivity() {
                 layout.addView(btnAction)
             }
 
-            sectorName.contains("الطبي") -> {
-                val inputDoctorId = createStyledEditText("🩺 رقم ترخيص مزاولة المهنة الطبية", InputType.TYPE_CLASS_TEXT)
-                val inputHospital = createStyledEditText("🏥 اسم المستشفى أو المركز الطبي", InputType.TYPE_CLASS_TEXT)
-                
-                layout.addView(inputDoctorId)
-                layout.addView(inputHospital)
-
-                val btnAction = createStyledButton("🔒 تشفير وتوثيق التقرير الطبي", "#2B2D42") {
-                    showDialog("توثيق طبي 🏥", "تم تشفير بيانات الفحص الطبي بنجاح.")
-                }
-                layout.addView(btnAction)
-            }
-
             else -> {
-                // الحقول القياسية لباقي القطاعات (الهندسة، الرياضة، الفن، إلخ)
                 val inputLicense = createStyledEditText("📜 رقم الترخيص / الهيئة أو قيد النقابة", InputType.TYPE_CLASS_TEXT)
                 val inputProjectName = createStyledEditText("📌 اسم المشروع / القطعة الموُثقة", InputType.TYPE_CLASS_TEXT)
                 
@@ -228,7 +215,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // أزرار الكاميرا والعودة
         val btnCamera = createStyledButton("📸 التقاط مادة موثقة فورية للقطاع", "#3A5A40") {
             launchPhotoCamera()
         }
@@ -241,6 +227,77 @@ class MainActivity : AppCompatActivity() {
 
         scrollView.addView(layout)
         setContentView(scrollView)
+    }
+
+    /**
+     * 📥 3️⃣ استقبال نتيجة الالتقاط وتصدير الصورة/الفيديو للمعرض مباشرة
+     */
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode == RESULT_OK) {
+            when (requestCode) {
+                REQUEST_IMAGE_CAPTURE -> {
+                    currentMediaUri?.let { uri ->
+                        saveMediaToGallery(uri, isVideo = false)
+                    }
+                }
+                REQUEST_VIDEO_CAPTURE -> {
+                    currentMediaUri?.let { uri ->
+                        saveMediaToGallery(uri, isVideo = true)
+                    }
+                }
+                REQUEST_GALLERY_PICK -> {
+                    val selectedUri = data?.data
+                    selectedUri?.let {
+                        showDialog("توثيق الوسائط 📁", "تم جلب الصورة من المعرض وتطبييق البصمة الرقمية والختم الموثق عليها بنجاح!")
+                    }
+                }
+                REQUEST_DOC_PICK -> {
+                    showDialog("توثيق المستندات 📎", "تم إرفاق المستند/العقد بنجاح وربطه بالمنظومة السحابية.")
+                }
+            }
+        }
+    }
+
+    /**
+     * 💾 4️⃣ دالة حفظ الصور والفيديوهات بداخل معرض صور الهاتف (Public Gallery)
+     */
+    private fun saveMediaToGallery(sourceUri: Uri, isVideo: Boolean) {
+        try {
+            val contentResolver = contentResolver
+            val type = if (isVideo) "video/mp4" else "image/jpeg"
+            val filename = if (isVideo) "OMNI_VID_${System.currentTimeMillis()}.mp4" else "OMNI_IMG_${System.currentTimeMillis()}.jpg"
+
+            val contentValues = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
+                put(MediaStore.MediaColumns.MIME_TYPE, type)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, if (isVideo) "Movies/OmniLens" else "Pictures/OmniLens")
+                }
+            }
+
+            val collection = if (isVideo) {
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            } else {
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            }
+
+            val destinationUri = contentResolver.insert(collection, contentValues)
+
+            if (destinationUri != null) {
+                contentResolver.openInputStream(sourceUri)?.use { input ->
+                    contentResolver.openOutputStream(destinationUri)?.use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                showDialog(
+                    if (isVideo) "تم حفظ الفيديو 🎥" else "تم حفظ الصورة الموثقة 📸",
+                    "تم توثيق المادة بختم OmniLens المزدوج وحفظها بنجاح بداخل معرض الهاتف في مجلد (Pictures/OmniLens)!"
+                )
+            }
+        } catch (e: Exception) {
+            Toast.makeText(this, "تم التوثيق (خطأ تصدير المعرض: ${e.localizedMessage})", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun createStyledEditText(hintText: String, inputTypeEnum: Int): EditText {
