@@ -5,96 +5,94 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
-import android.graphics.Typeface
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
 
 object OmniWatermarkEngine {
 
+    // 🌐 رابط خادم التوثيق السحابي المباشر على Render
+    private const val BASE_VERIFY_URL = "https://omnilens-verify.onrender.com/v/"
+
     /**
-     * دالة توليد الصورة الموثقة بشريط OmniLens الموحد
+     * معالجة الصورة وإضافة شريط التوثيق والرابط الحي مع بصمة SHA-256
      */
-    fun createCertifiedImage(
-        originalBitmap: Bitmap,
-        recipientPhone: String,
-        recipientEmail: String,
-        licenseType: String = "ترخيص تجاري مدفوع",
-        isPrivateMode: Boolean = false
-    ): Bitmap {
-        val width = originalBitmap.width
-        val height = originalBitmap.height
+    fun applyOmniLensWatermark(originalBitmap: Bitmap): Bitmap {
+        // 1. حساب بصمة SHA-256 للصورة واقتطاع أول 10 أحرف لرمز البصمة المختصر
+        val fullHash = calculateSHA256(originalBitmap)
+        val shortHash = fullHash.take(10)
+        
+        // 2. تكوين رابط التوثيق المباشر
+        val verifyUrl = "$BASE_VERIFY_URL$shortHash"
 
-        // 1. حساب ارتفاع الشريط السفلي (14% من ارتفاع الصورة)
-        val bannerHeight = (height * 0.14f).toInt().coerceAtLeast(140)
-        val totalHeight = height + bannerHeight
+        // 3. إنشاء نسخة قابلة للتعديل من الصورة
+        val mutableBitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
+        val canvas = Canvas(mutableBitmap)
 
-        // 2. إنشاء المساحة الكلية للصورة + الشريط
-        val certifiedBitmap = Bitmap.createBitmap(width, totalHeight, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(certifiedBitmap)
+        val width = mutableBitmap.width
+        val height = mutableBitmap.height
 
-        // 3. رسم الصورة الأصلية
-        canvas.drawBitmap(originalBitmap, 0f, 0f, null)
+        // 4. تحديد ارتفاع شريط التوثيق في أسفل الصورة
+        val bannerHeight = (height * 0.08f).coerceAtLeast(140f)
 
-        // 4. رسم خلفية الشريط السفلي (#1A1A1E)
+        // 5. رسم خلفية الشريط (أسود داكن راقي)
         val bannerPaint = Paint().apply {
-            color = Color.parseColor("#1A1A1E")
+            color = Color.parseColor("#E60D1117")
             style = Paint.Style.FILL
         }
-        canvas.drawRect(RectF(0f, height.toFloat(), width.toFloat(), totalHeight.toFloat()), bannerPaint)
+        val bannerRect = RectF(0f, height - bannerHeight, width.toFloat(), height.toFloat())
+        canvas.drawRect(bannerRect, bannerPaint)
 
-        // 5. رسم الخط الفاصل (ذهبي للمدفع والمهدى / أحمر للخاصة)
-        val borderPaint = Paint().apply {
-            color = if (isPrivateMode) Color.parseColor("#C0392B") else Color.parseColor("#D4AF37")
-            strokeWidth = (height * 0.005f).coerceAtLeast(4f)
+        // 6. رسم خط أفق أخضر علوي للشريط (علامة الأمان)
+        val linePaint = Paint().apply {
+            color = Color.parseColor("#238636")
+            strokeWidth = (bannerHeight * 0.04f).coerceAtLeast(5f)
         }
-        canvas.drawLine(0f, height.toFloat(), width.toFloat(), height.toFloat(), borderPaint)
+        canvas.drawLine(0f, height - bannerHeight, width.toFloat(), height - bannerHeight, linePaint)
 
-        // 6. إعداد الخطوط
-        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        // 7. إعداد الخطوط والنصوص
+        val titleFontSize = (bannerHeight * 0.28f).coerceAtLeast(26f)
+        val bodyFontSize = (bannerHeight * 0.22f).coerceAtLeast(20f)
+
+        val titlePaint = Paint().apply {
+            color = Color.parseColor("#2EA043")
+            textSize = titleFontSize
+            isFakeBoldText = true
+            isAntiAlias = true
+        }
+
+        val urlPaint = Paint().apply {
             color = Color.WHITE
-            textSize = bannerHeight * 0.20f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textSize = bodyFontSize
+            isAntiAlias = true
         }
 
-        val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#CCCCCC")
-            textSize = bannerHeight * 0.15f
-        }
-
-        val hashPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (isPrivateMode) Color.parseColor("#E74C3C") else Color.parseColor("#D4AF37")
-            textSize = bannerHeight * 0.12f
-            typeface = Typeface.MONOSPACE
-        }
-
-        // 7. حساب بصمة SHA-256
-        val imageHash = generateSHA256(originalBitmap)
-
-        // 8. كتابة النصوص
+        // 8. رسم النصوص على الشريط
         val paddingX = width * 0.04f
-        var currentY = height + (bannerHeight * 0.28f)
+        val startY = height - bannerHeight + (bannerHeight * 0.38f)
 
-        // السطر الأول: العبارة الموحدة الجديدة
-        canvas.drawText("🔒 جميع الحقوق محفوظة بواسطة OmniLens", paddingX, currentY, titlePaint)
+        canvas.drawText("✔ صورة موثقة | OmniLens Engine 2026", paddingX, startY, titlePaint)
+        canvas.drawText("Verify: $verifyUrl", paddingX, startY + (bannerHeight * 0.35f), urlPaint)
 
-        // السطر الثاني: البيانات المزدوجة ونوع الترخيص
-        currentY += bannerHeight * 0.24f
-        val ownerLabel = if (isPrivateMode) "المالك الأصلي" else "المرخص له"
-        val recipientDetails = "👤 $ownerLabel: $recipientPhone | ✉️ $recipientEmail | 📌 $licenseType"
-        canvas.drawText(recipientDetails, paddingX, currentY, detailPaint)
-
-        // السطر الثالث: بصمة SHA-256
-        currentY += bannerHeight * 0.22f
-        val shortHash = if (imageHash.length > 32) "${imageHash.substring(0, 32)}..." else imageHash
-        canvas.drawText("🔑 SHA-256: $shortHash", paddingX, currentY, hashPaint)
-
-        return certifiedBitmap
+        return mutableBitmap
     }
 
-    private fun generateSHA256(bitmap: Bitmap): String {
+    /**
+     * خوارزمية حساب بصمة SHA-256 لمصفوفة بيانات الصورة
+     */
+    private fun calculateSHA256(bitmap: Bitmap): String {
         val stream = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
-        val hashBytes = MessageDigest.getInstance("SHA-256").digest(stream.toByteArray())
-        return hashBytes.joinToString("") { "%02x".format(it) }
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
+        val byteArray = stream.toByteArray()
+
+        val digest = MessageDigest.getInstance("SHA-256")
+        val hashBytes = digest.digest(byteArray)
+
+        val hexString = StringBuilder()
+        for (b in hashBytes) {
+            val hex = Integer.toHexString(0xff and b.toInt())
+            if (hex.length == 1) hexString.append('0')
+            hexString.append(hex)
+        }
+        return hexString.toString()
     }
 }
