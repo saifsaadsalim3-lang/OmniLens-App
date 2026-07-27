@@ -1,10 +1,16 @@
 package com.omnilens.omniguard
 
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
-import android.view.View
+import android.view.Gravity
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -14,8 +20,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.concurrent.thread
 
-import com.omnilens.omniguard.R
-
 class MainActivity : AppCompatActivity() {
 
     private val REQUEST_IMAGE_CAPTURE = 1001
@@ -24,11 +28,80 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // ربط الواجهة البرمجية بعد توفر ملف التصميم XML
-        setContentView(R.layout.activity_main)
+
+        // 🎯 1. إنشاء الحاوية الرئيسية الشاملة للتمرير (ScrollView)
+        val scrollView = ScrollView(this).apply {
+            setBackgroundColor(Color.parseColor("#0B132B"))
+            isFillViewport = true
+        }
+
+        // 🎯 2. إنشاء التخطيط العمودي للأنشطة والأزرار
+        val mainLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(40, 60, 40, 60)
+        }
+
+        // 🎯 3. عنوان المنظومة
+        val titleText = TextView(this).apply {
+            text = "منظومة OmniLens Engine v2.0"
+            setTextColor(Color.WHITE)
+            textSize = 20f
+            setTypeface(null, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 40)
+        }
+        mainLayout.addView(titleText)
+
+        // 🎯 4. إضافة الأزرار والتصاميم برمجياً
+        val btnPhoto = createStyledButton("📸 التقاط بالكاميرا الخلفية") {
+            launchPhotoCamera()
+        }
+        mainLayout.addView(btnPhoto)
+
+        val btnVideo = createStyledButton("🎥 تصوير مقطع فيديو موثق") {
+            launchVideoCamera()
+        }
+        mainLayout.addView(btnVideo)
+
+        val btnPayment = createStyledButton("💳 التحقق من الدفع والضمان المالي") {
+            checkPaymentAndEscrowStatus("OMNI-CONTRACT-01")
+        }
+        mainLayout.addView(btnPayment)
+
+        val btnAccount = createStyledButton("👤 حساب المنصة والإعدادات") {
+            showAccountDialog()
+        }
+        mainLayout.addView(btnAccount)
+
+        // 🎯 5. عرض الواجهة المبنية على الشاشة فوراً
+        scrollView.addView(mainLayout)
+        setContentView(scrollView)
     }
 
-    fun launchPhotoCamera(view: View? = null) {
+    /**
+     * دالة مساعدة لتنسيق أزرار الواجهة
+     */
+    private fun createStyledButton(buttonText: String, onClickAction: () -> Unit): Button {
+        return Button(this).apply {
+            text = buttonText
+            textSize = 15f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#1C2541"))
+            setOnClickListener { onClickAction() }
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                150
+            )
+            params.setMargins(0, 0, 0, 30)
+            layoutParams = params
+        }
+    }
+
+    /**
+     * دالة التقاط الصور
+     */
+    fun launchPhotoCamera() {
         try {
             val photoFile = File.createTempFile("omni_img_", ".jpg", cacheDir)
             val authority = "$packageName.provider"
@@ -44,7 +117,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun launchVideoCamera(view: View? = null) {
+    /**
+     * دالة تصوير الفيديو
+     */
+    fun launchVideoCamera() {
         try {
             val videoFile = File.createTempFile("omni_vid_", ".mp4", cacheDir)
             val authority = "$packageName.provider"
@@ -61,10 +137,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun checkPaymentButton(view: View? = null) {
-        checkPaymentAndEscrowStatus("OMNI-CONTRACT-01")
-    }
-
+    /**
+     * نظام التحقق من الدفع المالي
+     */
     fun checkPaymentAndEscrowStatus(contractId: String) {
         Toast.makeText(this, "جاري التحقق من عملية الدفع والعقد أونلاين...", Toast.LENGTH_SHORT).show()
 
@@ -91,7 +166,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun showAccountDialog(view: View? = null) {
+    /**
+     * نافذة حساب المنصة
+     */
+    fun showAccountDialog() {
         AlertDialog.Builder(this)
             .setTitle("👤 حساب المنصة | OmniLens Profile")
             .setMessage("الحساب: موثق رسمي (Creator & Press)\nالمعرف الآمن: SECURE-OMNI-2026\nحالة المزامنة: متصل بالسيرفر الحي 🟢")
