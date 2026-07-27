@@ -30,9 +30,14 @@ jobs:
       - name: Build Debug APK
         run: ./gradlew assembleDebug --no-daemon
 
+      - name: Prepare and Rename APK
+        run: |
+          mkdir -p output_apk
+          find app/build/outputs/apk/debug/ -name "*.apk" -exec cp {} output_apk/OmniLens-v1.9.1.apk \;
+
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: OmniLens-v1.9.1-APK
-          path: '**/build/outputs/apk/debug/*.apk'
+          path: output_apk/OmniLens-v1.9.1.apk
           if-no-files-found: error
