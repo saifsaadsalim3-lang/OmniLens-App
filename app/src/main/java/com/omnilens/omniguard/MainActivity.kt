@@ -1,6 +1,8 @@
 package com.omnilens.omniguard
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.*
 import android.net.Uri
 import android.os.Build
@@ -8,10 +10,13 @@ import android.os.Bundle
 import android.provider.MediaStore
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import java.io.File
 import java.io.FileOutputStream
@@ -22,40 +27,57 @@ import java.util.*
 class MainActivity : AppCompatActivity() {
 
     private var currentImageUri: Uri? = null
+    private var cameraTempUri: Uri? = null
+
+    private val REQUEST_CAMERA_PERMISSION = 2001
+    private val REQUEST_CAMERA_CAPTURE = 1002
+    private val REQUEST_GALLERY_PICK = 1001
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         try {
+            val scrollView = ScrollView(this).apply {
+                setBackgroundColor(Color.parseColor("#0F172A"))
+            }
+
             val rootLayout = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                setPadding(60, 120, 60, 60)
-                setBackgroundColor(Color.parseColor("#0F172A"))
+                setPadding(50, 80, 50, 80)
             }
 
             val titleTv = TextView(this).apply {
                 text = "🛡️ منظومة OmniLens Engine v2.0"
-                textSize = 20f
+                textSize = 22f
                 setTextColor(Color.WHITE)
                 typeface = Typeface.DEFAULT_BOLD
-                setPadding(0, 0, 0, 30)
+                setPadding(0, 0, 0, 20)
             }
 
             val descTv = TextView(this).apply {
-                text = "المحرك الرسمي الموحد لتوثيق الصور وحفظ الحقوق الرقمية.\nاختر أحد الخيارات للبدء:"
-                textSize = 14f
+                text = "المحرك الموحد للتشفير الرقمي والتوثيق التخصصي للأصول الإعلامية:"
+                textSize = 13f
                 setTextColor(Color.parseColor("#94A3B8"))
                 setPadding(0, 0, 0, 40)
             }
 
+            // قسم وسائل التقاط الصور
+            val sectionSourceTitle = TextView(this).apply {
+                text = "📸 وسائل التقاط وجلب الوسائط"
+                textSize = 16f
+                setTextColor(Color.parseColor("#38BDF8"))
+                typeface = Typeface.DEFAULT_BOLD
+                setPadding(0, 10, 0, 20)
+            }
+
             val btnCameraBack = Button(this).apply {
                 text = "📷 التقاط بالكاميرا الخلفية"
-                setOnClickListener { openCamera(isFront = false) }
+                setOnClickListener { checkPermissionAndOpenCamera(isFront = false) }
             }
 
             val btnCameraFront = Button(this).apply {
                 text = "🤳 التقاط بالكاميرا الأمامية"
-                setOnClickListener { openCamera(isFront = true) }
+                setOnClickListener { checkPermissionAndOpenCamera(isFront = true) }
             }
 
             val btnGallery = Button(this).apply {
@@ -63,14 +85,53 @@ class MainActivity : AppCompatActivity() {
                 setOnClickListener { openGallery() }
             }
 
+            // قسم الأقسام المتخصصة للتطبيقات الفعلية
+            val sectionCategoryTitle = TextView(this).apply {
+                text = "🏷️ الأقسام التخصصية المعتمدة للتوثيق"
+                textSize = 16f
+                setTextColor(Color.parseColor("#38BDF8"))
+                typeface = Typeface.DEFAULT_BOLD
+                setPadding(0, 40, 0, 20)
+            }
+
+            val btnMedical = Button(this).apply {
+                text = "🏥 التوثيق الطبي والصحي (Medical Record)"
+                setOnClickListener { selectCategoryAndProceed(0) }
+            }
+
+            val btnCinematic = Button(this).apply {
+                text = "🎬 التوثيق السينمائي والإنتاجي (Cinematic Master)"
+                setOnClickListener { selectCategoryAndProceed(1) }
+            }
+
+            val btnCommercial = Button(this).apply {
+                text = "🟢 التوثيق التجاري المدفوع (Commercial)"
+                setOnClickListener { selectCategoryAndProceed(2) }
+            }
+
+            val btnProprietary = Button(this).apply {
+                text = "🔴 الملكية الخاصة والمنع (PROPRIETARY)"
+                setOnClickListener { selectCategoryAndProceed(3) }
+            }
+
             rootLayout.addView(titleTv)
             rootLayout.addView(descTv)
+
+            rootLayout.addView(sectionSourceTitle)
             rootLayout.addView(btnCameraBack)
             rootLayout.addView(btnCameraFront)
             rootLayout.addView(btnGallery)
 
-            setContentView(rootLayout)
+            rootLayout.addView(sectionCategoryTitle)
+            rootLayout.addView(btnMedical)
+            rootLayout.addView(btnCinematic)
+            rootLayout.addView(btnCommercial)
+            rootLayout.addView(btnProprietary)
 
+            scrollView.addView(rootLayout)
+            setContentView(scrollView)
+
+            // معالجة مشاركة الصورة من التطبيقات الخارجية
             if (intent?.action == Intent.ACTION_SEND && intent.type?.startsWith("image/") == true) {
                 val streamUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
@@ -88,40 +149,126 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun checkPermissionAndOpenCamera(isFront: Boolean) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.CAMERA),
+                REQUEST_CAMERA_PERMISSION
+            )
+        } else {
+            openCamera(isFront)
+        }
+    }
+
+    private fun openCamera(isFront: Boolean) {
+        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+        if (isFront) {
+            intent.putExtra("android.intent.extras.CAMERA_FACING", 1)
+            intent.putExtra("android.intent.extras.LENS_FACING_FRONT", 1)
+            intent.putExtra("useFrontCamera", true)
+        } else {
+            intent.putExtra("android.intent.extras.CAMERA_FACING", 0)
+        }
+
+        try {
+            val photoFile = File.createTempFile("omnilens_capture_${System.currentTimeMillis()}", ".jpg", cacheDir)
+            cameraTempUri = FileProvider.getUriForFile(this, "$packageName.fileprovider", photoFile)
+            
+            intent.putExtra(MediaStore.EXTRA_OUTPUT, cameraTempUri)
+            intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            
+            startActivityForResult(intent, REQUEST_CAMERA_CAPTURE)
+        } catch (e: Exception) {
+            Toast.makeText(this, "تعذر فتح الكاميرا: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun openGallery() {
+        val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+        try {
+            startActivityForResult(intent, REQUEST_GALLERY_PICK)
+        } catch (e: Exception) {
+            Toast.makeText(this, "تعذر فتح المعرض: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_CAMERA_PERMISSION) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this, "تم إعطاء إذن الكاميرا، اضغط للالتقاط الآن", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "يلزم السماح بإذن الكاميرا للتمكن من التقاط الصور", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode == RESULT_OK) {
+            when (requestCode) {
+                REQUEST_GALLERY_PICK -> {
+                    data?.data?.let { uri ->
+                        currentImageUri = uri
+                        showLicenseSelectionDialog()
+                    }
+                }
+                REQUEST_CAMERA_CAPTURE -> {
+                    cameraTempUri?.let { uri ->
+                        currentImageUri = uri
+                        showLicenseSelectionDialog()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun selectCategoryAndProceed(categoryIndex: Int) {
+        if (currentImageUri != null) {
+            processAndDrawWatermark(currentImageUri!!, categoryIndex)
+        } else {
+            Toast.makeText(this, "اختر أو التقط صورة أولاً لترخيصها تحت هذا القسم", Toast.LENGTH_SHORT).show()
+            openGallery()
+        }
+    }
+
     private fun showLicenseSelectionDialog() {
         val licenseTypes = arrayOf(
-            "🟢 ترخيص تجاري مدفوع",
-            "🔵 إهداء خاص",
-            "🔴 ملكية خاصة (يمنع النشر)",
+            "🏥 التوثيق الطبي والصحي (Medical Record)",
+            "🎬 التوثيق السينمائي والإنتاجي (Cinematic Master)",
+            "🟢 ترخيص تجاري مدفوع (Commercial)",
+            "🔴 ملكية خاصة — يمنع النشر (PROPRIETARY)",
             "⚪ ترخيص مجاني (استخدام عام)"
         )
 
         AlertDialog.Builder(this)
-            .setTitle("اختر نوع التوثيق — OmniLens")
+            .setTitle("اختر قسم التوثيق — OmniLens")
             .setItems(licenseTypes) { _, which ->
                 currentImageUri?.let { uri ->
                     processAndDrawWatermark(uri, which)
-                } ?: run {
-                    Toast.makeText(this, "يرجى اختيار صورة أولاً", Toast.LENGTH_SHORT).show()
-                    openGallery()
                 }
             }
             .setNegativeButton("إلغاء", null)
             .show()
     }
 
-    private fun processAndDrawWatermark(imageUri: Uri, licenseTypeIndex: Int) {
+    private fun processAndDrawWatermark(imageUri: Uri, categoryIndex: Int) {
         try {
             val inputStream = contentResolver.openInputStream(imageUri)
             val originalBitmap = BitmapFactory.decodeStream(inputStream)
             inputStream?.close()
 
             if (originalBitmap == null) {
-                Toast.makeText(this, "تعذر قراءة الصورة", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "تعذر قراءة ملف الصورة", Toast.LENGTH_SHORT).show()
                 return
             }
 
-            val bannerHeight = (originalBitmap.height * 0.12f).coerceAtLeast(140f).toInt()
+            val bannerHeight = (originalBitmap.height * 0.13f).coerceAtLeast(160f).toInt()
             val newBitmap = Bitmap.createBitmap(
                 originalBitmap.width,
                 originalBitmap.height + bannerHeight,
@@ -131,18 +278,23 @@ class MainActivity : AppCompatActivity() {
             val canvas = Canvas(newBitmap)
             canvas.drawBitmap(originalBitmap, 0f, 0f, null)
 
-            val (bgColor, headerText, detailText) = when (licenseTypeIndex) {
+            val (bgColor, headerText, detailText) = when (categoryIndex) {
                 0 -> Triple(
+                    Color.parseColor("#0284C7"),
+                    "🏥 توثيق طبي معتمد — Medical Record",
+                    "سجل طبي محمي بموجب معايير الخصوصية والتشفير الرقمي لمنظومة OmniLens"
+                )
+                1 -> Triple(
+                    Color.parseColor("#D97706"),
+                    "🎬 توثيق إنتاج سينمائي — Cinematic Master",
+                    "حقوق العرض والإخراج محفوظة لمنظومة الإنتاج الرقمي المعتمدة"
+                )
+                2 -> Triple(
                     Color.parseColor("#15803D"),
                     "🟢 ترخيص تجاري مدفوع — Commercial License",
                     "حقوق التداول والاستخدام محددة بموجب ترخيص OmniLens الرقمي"
                 )
-                1 -> Triple(
-                    Color.parseColor("#1D4ED8"),
-                    "🔵 إهداء خاص — Private Gift",
-                    "محتوى خاص مُهدى بموجب حقوق المالك الأصلي"
-                )
-                2 -> Triple(
+                3 -> Triple(
                     Color.parseColor("#B91C1C"),
                     "🔴 ملكية خاصة — يمنع النشر أو التداول (PROPRIETARY)",
                     "محمي جنائياً | المالك: saifsaadsalim3@gmail.com | يحظر التداول بدون إذن"
@@ -165,7 +317,7 @@ class MainActivity : AppCompatActivity() {
             canvas.drawRect(bannerRect, paint)
 
             val timeStamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-            val sha256Hash = generateSHA256("$timeStamp-$licenseTypeIndex-${originalBitmap.width}")
+            val sha256Hash = generateSHA256("$timeStamp-$categoryIndex-${originalBitmap.width}")
 
             val textPaint = Paint().apply {
                 color = Color.WHITE
@@ -174,18 +326,18 @@ class MainActivity : AppCompatActivity() {
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             }
 
-            val startX = 30f
-            var startY = originalBitmap.height + (bannerHeight * 0.32f)
+            val startX = 35f
+            var startY = originalBitmap.height + (bannerHeight * 0.30f)
 
             canvas.drawText(headerText, startX, startY, textPaint)
 
-            textPaint.textSize = bannerHeight * 0.16f
+            textPaint.textSize = bannerHeight * 0.15f
             textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-            startY += bannerHeight * 0.26f
+            startY += bannerHeight * 0.25f
             canvas.drawText(detailText, startX, startY, textPaint)
 
-            textPaint.textSize = bannerHeight * 0.13f
-            textPaint.color = Color.parseColor("#CBD5E1")
+            textPaint.textSize = bannerHeight * 0.12f
+            textPaint.color = Color.parseColor("#E2E8F0")
             startY += bannerHeight * 0.22f
             canvas.drawText("SHA-256: ${sha256Hash.take(32)}... | Date: $timeStamp", startX, startY, textPaint)
 
@@ -221,40 +373,6 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent.createChooser(shareIntent, "مشاركة الصورة الموثقة بشريط OmniLens"))
         } catch (e: Exception) {
             Toast.makeText(this, "تعذر مشاركة الصورة: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
-        }
-    }
-
-    private fun openCamera(isFront: Boolean) {
-        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        if (isFront) {
-            intent.putExtra("android.intent.extras.CAMERA_FACING", 1)
-            intent.putExtra("android.intent.extras.LENS_FACING_FRONT", 1)
-        } else {
-            intent.putExtra("android.intent.extras.CAMERA_FACING", 0)
-        }
-        try {
-            startActivity(intent)
-        } catch (e: Exception) {
-            Toast.makeText(this, "تعذر فتح الكاميرا: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun openGallery() {
-        val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
-        try {
-            startActivityForResult(intent, 1001)
-        } catch (e: Exception) {
-            Toast.makeText(this, "تعذر فتح المعرض: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 1001 && resultCode == RESULT_OK) {
-            data?.data?.let { uri ->
-                currentImageUri = uri
-                showLicenseSelectionDialog()
-            }
         }
     }
 }
