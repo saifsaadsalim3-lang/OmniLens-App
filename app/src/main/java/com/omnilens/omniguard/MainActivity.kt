@@ -11,7 +11,7 @@ import android.os.Bundle
 import android.provider.MediaStore
 import android.text.InputType
 import android.view.Gravity
-import android.view.View
+import android.view.WindowManager
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -38,6 +38,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 🛡️ الطبقة الأولى: حظر لقطات الشاشة وتسجيلها بداخل التطبيق
+        window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         showMainDashboard()
     }
 
@@ -56,7 +58,6 @@ class MainActivity : AppCompatActivity() {
             setPadding(30, 50, 30, 50)
         }
 
-        // ترويسة المنظومة
         val headerLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
@@ -88,13 +89,13 @@ class MainActivity : AppCompatActivity() {
         }
         mainLayout.addView(subTitleText)
 
-        // 📸 الكاميرا الميدانية (Offline Mode Ready - Photos & Videos)
+        // 📸 الكاميرا الميدانية
         mainLayout.addView(createSectionHeader("📸 الكاميرا الميدانية والتوثيق المباشر"))
-        mainLayout.addView(createStyledButton("📷 التقاط صورة بالختم المزدوج والتعتيم", "#1C2541") { launchPhotoCamera() })
+        mainLayout.addView(createStyledButton("📷 التقاط صورة وتوثيقها بالبصمة", "#1C2541") { launchPhotoCamera() })
         mainLayout.addView(createStyledButton("🎥 تصوير مقطع فيديو موثق بالبصمة", "#1C2541") { launchVideoCamera() })
         mainLayout.addView(createStyledButton("📁 اختيار وسيط من المعرض وتوثيقه", "#1C2541") { openGallery() })
 
-        // 💬 الشات والتفاوض والضمان المالي (Escrow Hub)
+        // 💬 مركز الشات والضمان المالي (Escrow Chat)
         mainLayout.addView(createSectionHeader("💬 التفاوض والضمان المالي (Escrow Chat)"))
         mainLayout.addView(createStyledButton("💬 دخول مركز المحادثات والمعاينة المقفولة", "#0077B6") { openChatHub() })
 
@@ -115,7 +116,7 @@ class MainActivity : AppCompatActivity() {
             mainLayout.addView(createStyledButton(sector, "#2B2D42") { openSectorPage(sector) })
         }
 
-        // 🔐 الخزنة والحساب
+        // 🔐 الخزنة المشفرة والحساب
         mainLayout.addView(createSectionHeader("👤 الحساب والخزنة المشفرة"))
         mainLayout.addView(createStyledButton("🔒 فتح الخزنة المشفرة (Private Vault)", "#5C4D7D") { openPrivateVault() })
         mainLayout.addView(createStyledButton("⚙️ إعدادات الحساب والمزامنة السحابية", "#6C757D") { showAccountDialog() })
@@ -184,10 +185,9 @@ class MainActivity : AppCompatActivity() {
                     targetRecipientName = inputGift.text.toString()
                 }
                 LicenseMode.PRIVATE -> {
-                    // تم تصحيح نوع الإدخال هنا ليتوافق مع أندرويد
                     dynamicFormContainer.addView(createStyledEditText("🔐 كلمة السر الخاصة بالخزنة المشفرة", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD))
                     val info = TextView(this).apply {
-                        text = "🛡️ سيتم تطبيق التعتيم الشفاف والبصمة المخفية للتتبع الجنائي على الصور والفيديوهات."
+                        text = "🛡️ سيتم تطبيق النمط الشبكي الدقيق والبصمة الترددية لتتبع أي تصوير خارجي."
                         setTextColor(Color.YELLOW)
                         textSize = 11f
                         setPadding(0, 10, 0, 20)
@@ -254,7 +254,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val cardTitle = TextView(this).apply {
-            text = "🔒 صورة/فيديو موثق (معاينة ضبابية مقفولة)"
+            text = "🔒 صورة/فيديو موثق (معاينة مقفولة)"
             setTextColor(Color.YELLOW)
             textSize = 13f
             setTypeface(null, Typeface.BOLD)
@@ -262,7 +262,7 @@ class MainActivity : AppCompatActivity() {
         cardLayout.addView(cardTitle)
 
         val cardDesc = TextView(this).apply {
-            text = "قيمة العقد: $250 USD\nالمالك: Saif Saad\nالحالة: الفيديو/الصورة محمية بـ (Locked Blurred Preview) بانتظار الإيداع."
+            text = "قيمة العقد: $250 USD\nالمالك: ՏԹɿԲ. Տ. ՏԹʅɿʍ\nالحالة: المادة محمية بالنمط الشبكي الدقيق بانتظار الإيداع."
             setTextColor(Color.WHITE)
             textSize = 11f
             setPadding(0, 10, 0, 20)
@@ -270,13 +270,13 @@ class MainActivity : AppCompatActivity() {
         cardLayout.addView(cardDesc)
 
         val btnDeposit = createStyledButton("💳 إيداع المبلغ بحساب الضمان (Escrow Deposit)", "#0077B6") {
-            showDialog("حجز المبلغ 💳", "تم إيداع $250 USD بنجاح بداخل حساب الضمان، وتوثيق استلام النسخة العالية الجودة بدون ضبابية.")
+            showDialog("حجز المبلغ 💳", "تم إيداع $250 USD بنجاح بداخل حساب الضمان، وفك المعاينة المقفولة للعميل.")
         }
         val btnRelease = createStyledButton("✅ اعتماد واستلام المادة (Release Funds)", "#3A5A40") {
-            showDialog("إفراج عن المبلغ 💸", "تم تحويل المبلغ المالي المباشر لحسابك بنجاح!")
+            showDialog("إفراج عن المبلغ 💸", "تم تسليم النسخة الأصلية الصافية 100% بدون شبكة تعتيم للمشتري، وتحويل المبلغ لحسابك!")
         }
         val btnDispute = createStyledButton("⚠️ رفع نزاع مالي وتوثيقي (Open Dispute)", "#D90429") {
-            showDialog("فتح نزاع ⚠️", "تم تجميد الصفقة واستخراج تقرير التوثيق الجنائي للمراجعة.")
+            showDialog("فتح نزاع ⚠️", "تم تجميد الصفقة وتوليد تقرير الفحص الجنائي.")
         }
 
         cardLayout.addView(btnDeposit)
@@ -314,7 +314,7 @@ class MainActivity : AppCompatActivity() {
         layout.addView(vaultTitle)
 
         val vaultDesc = TextView(this).apply {
-            text = "تضم كافة الصور والفيديوهات الخاصة المحمية بالتعتيم الشفاف والبصمة الجنائية المخفية."
+            text = "تضم كافة المواد الخاصة المحمية بالبصمة الترددية المخفية والنمط الشبكي الدقيق."
             setTextColor(Color.parseColor("#8D99AE"))
             textSize = 11f
             gravity = Gravity.CENTER
@@ -329,7 +329,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * 🎨 5️⃣ محرك التعتيم الشفاف والتسويق الترويجي للصور (Promo Overlay Engine)
+     * 🎨 5️⃣ محرك التوثيق البصري والتلوين الميداني الديناميكي (Smart Watermark Engine)
      */
     private fun applyModelCWatermarkAndSave(sourceUri: Uri) {
         try {
@@ -340,50 +340,72 @@ class MainActivity : AppCompatActivity() {
             val width = mutableBitmap.width.toFloat()
             val height = mutableBitmap.height.toFloat()
 
-            // 1. التعتيم الشفاف الترويجي
-            val overlayPaint = Paint().apply {
-                color = Color.argb(110, 0, 0, 0)
-            }
-            canvas.drawRect(0f, 0f, width, height, overlayPaint)
+            // 1. تطبيق النمط الشبكي الدقيق (Micro-Grid) فقط في النمط المدفوع والخاص
+            if (activeMode == LicenseMode.PAID || activeMode == LicenseMode.PRIVATE) {
+                val gridPaint = Paint().apply {
+                    color = Color.WHITE
+                    alpha = 35 // شفافية خفيفة جداً ورائعة
+                    textSize = width * 0.028f
+                    typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                }
 
-            // 2. الشعار والعبارة الترويجية التحذيرية
-            val centerPaint = Paint().apply {
-                color = Color.WHITE
-                alpha = 90
-                textSize = width * 0.055f
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-                textAlign = Paint.Align.CENTER
-            }
-            canvas.drawText("🚨 PROTECTED & LEAK-TRACED BY OMNILENS", width / 2f, height / 2.2f, centerPaint)
+                canvas.save()
+                canvas.rotate(-30f, width / 2f, height / 2f)
 
-            val centerSubPaint = Paint().apply {
-                color = Color.YELLOW
-                alpha = 110
-                textSize = width * 0.032f
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-                textAlign = Paint.Align.CENTER
-            }
-            canvas.drawText("⚠️ وثيقة محمية - للكشف عن هوية المسرب تواصل مع المنظومة", width / 2f, (height / 2.2f) + 60f, centerSubPaint)
+                val stepX = width * 0.35f
+                val stepY = height * 0.12f
 
-            // 3. الشريط السفلي للبيانات
-            val bannerHeight = height * 0.12f
+                var y = -height
+                while (y < height * 2) {
+                    var x = -width
+                    while (x < width * 2) {
+                        canvas.drawText("OMNILENS • PROTECTED", x, y, gridPaint)
+                        x += stepX
+                    }
+                    y += stepY
+                }
+                canvas.restore()
+            }
+
+            // 2. ختم إهداء ناعم أنيق في حالة نمط الهدية (Gift Mode)
+            if (activeMode == LicenseMode.GIFT) {
+                val giftPaint = Paint().apply {
+                    color = Color.YELLOW
+                    alpha = 180
+                    textSize = width * 0.035f
+                    typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                    textAlign = Paint.Align.CENTER
+                }
+                val giftText = if (targetRecipientName.isNotEmpty()) "🎁 GIFTED TO: $targetRecipientName | BY: ՏԹɿԲ. Տ. ՏԹʅɿʍ" else "🎁 OFFICIAL GIFT | BY: ՏԹɿԲ. Տ. ՏԹʅɿʍ"
+                canvas.drawText(giftText, width / 2f, height * 0.85f, giftPaint)
+            }
+
+            // 3. تحديد لون الشريط الأسفلي الميداني الملون ديناميكياً بحسب النمط
+            val bannerColorHex = when (activeMode) {
+                LicenseMode.FREE -> "#1B4332"    // أخضر غابي داكن
+                LicenseMode.GIFT -> "#4A154B"    // أرجواني ملكي
+                LicenseMode.PAID -> "#0077B6"    // أزرق نيلي محيطي
+                LicenseMode.PRIVATE -> "#7F1D1D" // أحمر أمني داكن
+            }
+
+            val bannerHeight = height * 0.10f
             val bannerPaint = Paint().apply {
-                color = Color.argb(200, 11, 19, 43)
+                color = Color.parseColor(bannerColorHex)
             }
             canvas.drawRect(0f, height - bannerHeight, width, height, bannerPaint)
 
             val textPaint = Paint().apply {
                 color = Color.WHITE
-                textSize = width * 0.026f
+                textSize = width * 0.022f
                 typeface = Typeface.MONOSPACE
             }
 
             val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-            val line1 = "OWNER: Saif Saad | MODE: ${activeMode.name} | SECTOR: $activeSectorName"
+            val line1 = "omniLens | OWNER: ՏԹɿԲ. Տ. ՏԹʅɿʍ | MODE: ${activeMode.name} | SECTOR: $activeSectorName"
             val line2 = "TIME: $timestamp | TOKEN: OMNI-HW-ID-2026-SAIF"
 
-            canvas.drawText(line1, 30f, height - (bannerHeight * 0.55f), textPaint)
-            canvas.drawText(line2, 30f, height - (bannerHeight * 0.20f), textPaint)
+            canvas.drawText(line1, 25f, height - (bannerHeight * 0.55f), textPaint)
+            canvas.drawText(line2, 25f, height - (bannerHeight * 0.20f), textPaint)
 
             saveBitmapToPublicGallery(mutableBitmap)
 
@@ -393,18 +415,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * 🎥 6️⃣ محرك توثيق الفيديو وحقن البصمة الرقمية (Video Forensics Engine)
+     * 🎥 6️⃣ محرك توثيق الفيديو الميداني
      */
     private fun processVideoAndSave(videoUri: Uri) {
         try {
-            val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
             val filename = "OMNI_VIDEO_${System.currentTimeMillis()}.mp4"
 
             val contentValues = ContentValues().apply {
                 put(MediaStore.Video.Media.DISPLAY_NAME, filename)
                 put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-                put(MediaStore.Video.Media.TITLE, "OmniLens Protected Video")
-                put(MediaStore.Video.Media.DESCRIPTION, "OWNER: Saif Saad | TOKEN: OMNI-VID-2026-SAIF | MODE: ${activeMode.name}")
+                put(MediaStore.Video.Media.TITLE, "omniLens Protected Video")
+                put(MediaStore.Video.Media.DESCRIPTION, "OWNER: ՏԹɿԲ. Տ. ՏԹʅɿʍ | TOKEN: OMNI-VID-2026-SAIF | MODE: ${activeMode.name}")
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/OmniLens")
                 }
@@ -419,7 +440,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 showDialog(
                     "تم توثيق الفيديو بنجاح 🎥",
-                    "تم دمج البصمة الرقمية الجنائية وتطبيق النمط (${activeMode.name}) وحفظ الفيديو الموثق بداخل معرض الهاتف في مجلد (Movies/OmniLens)!"
+                    "تم حفر البصمة الرقمية وتطبيق الشريط الأسفلي الميداني وحفظ الفيديو في مجلد (Movies/OmniLens)!"
                 )
             }
         } catch (e: Exception) {
@@ -442,7 +463,7 @@ class MainActivity : AppCompatActivity() {
             contentResolver.openOutputStream(it)?.use { stream ->
                 bitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)
             }
-            showDialog("تم التوثيق الحصري 📸", "تم تطبيق التعتيم الشفاف والبصمة المزدوجة وحفظ الصورة بنجاح بداخل مجلد (Pictures/OmniLens)!")
+            showDialog("تم التوثيق بنجاح 📸", "تم تطبيق ختم التوثيق الميداني الملون وحفظ الصورة بنجاح في مجلد (Pictures/OmniLens)!")
         }
     }
 
@@ -509,7 +530,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun showAccountDialog() {
-        showDialog("👤 بروفايل المطور | Saif Saad", "المالك والمطور الرئيسي: سيف سعد\nمعرف النظام: OMNI-DEV-2026-SAIF\nحالة الحماية: نشطة بالكامل 🟢")
+        showDialog("👤 بروفايل المطور | ՏԹɿԲ. Տ. ՏԹʅɿʍ", "المالك والمطور الرئيسي: ՏԹɿԲ. Տ. ՏԹʅɿʍ\nمعرف المنظومة: OMNI-DEV-2026-SAIF\nحالة الحماية الجنائية: نشطة بالكامل 🟢")
     }
 
     private fun createStyledEditText(hintText: String, inputTypeEnum: Int): EditText {
