@@ -13,6 +13,9 @@ import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.concurrent.thread
 
+// 🎯 استيراد كلاس الموارد لحل خطأ Unresolved reference: layout
+import com.omnilens.omniguard.R
+
 class MainActivity : AppCompatActivity() {
 
     private val AUTHORITY = "com.omnilens.omniguard.provider"
@@ -23,7 +26,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // شاشة الواجهة الرسمية
         setContentView(R.layout.activity_main)
     }
 
@@ -55,7 +57,7 @@ class MainActivity : AppCompatActivity() {
 
             val intent = Intent(MediaStore.ACTION_VIDEO_CAPTURE).apply {
                 putExtra(MediaStore.EXTRA_OUTPUT, currentMediaUri)
-                putExtra(MediaStore.EXTRA_DURATION_LIMIT, 60) // تحديد المدة بـ 60 ثانية
+                putExtra(MediaStore.EXTRA_DURATION_LIMIT, 60)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             }
             startActivityForResult(intent, REQUEST_VIDEO_CAPTURE)
