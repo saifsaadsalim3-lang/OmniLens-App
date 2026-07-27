@@ -33,6 +33,25 @@ class MainActivity : AppCompatActivity() {
     private val REQUEST_CAMERA_CAPTURE = 1002
     private val REQUEST_GALLERY_PICK = 1001
 
+    // قائمة القطاعات التخصصية المعتمدة
+    private val sectors = arrayOf(
+        "⚽ القطاع الرياضي والفعاليات (Sports & Events)",
+        "📰 الصحافة والإعلام (Journalism & Press)",
+        "🏥 القطاع الطبي والصحي (Medical & Health)",
+        "🎬 الإنتاج السينمائي والمرئي (Cinematic Master)",
+        "🎨 الفن الرقمي والتصميم (Fine Art & NFT)",
+        "📐 الهندسة والمخططات (Engineering & Architecture)",
+        "🎓 القطاع الأكاديمي والبحثي (Academic & Research)"
+    )
+
+    // مستويات التراخيص الأربعة المتاحة لكل قطاع
+    private val licenseTiers = arrayOf(
+        "🟢 ترخيص تجاري مدفوع (Commercial License)",
+        "🔵 إهداء خاص (Private Gift)",
+        "🔴 ملكية خاصة — يمنع النشر (PROPRIETARY)",
+        "⚪ ترخيص مجاني (Free Public License)"
+    )
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -55,16 +74,16 @@ class MainActivity : AppCompatActivity() {
             }
 
             val descTv = TextView(this).apply {
-                text = "المحرك الموحد للتشفير الرقمي والتوثيق التخصصي للأصول الإعلامية:"
+                text = "منظومة الحماية والتشفير الرقمي للأصول الإعلامية والتخصصية:"
                 textSize = 13f
                 setTextColor(Color.parseColor("#94A3B8"))
                 setPadding(0, 0, 0, 40)
             }
 
-            // قسم وسائل التقاط الصور
+            // قسم الالتقاط والجلب
             val sectionSourceTitle = TextView(this).apply {
                 text = "📸 وسائل التقاط وجلب الوسائط"
-                textSize = 16f
+                textSize = 15f
                 setTextColor(Color.parseColor("#38BDF8"))
                 typeface = Typeface.DEFAULT_BOLD
                 setPadding(0, 10, 0, 20)
@@ -85,53 +104,36 @@ class MainActivity : AppCompatActivity() {
                 setOnClickListener { openGallery() }
             }
 
-            // قسم الأقسام المتخصصة للتطبيقات الفعلية
+            // قسم الأقسام التخصصية المباشرة
             val sectionCategoryTitle = TextView(this).apply {
-                text = "🏷️ الأقسام التخصصية المعتمدة للتوثيق"
-                textSize = 16f
+                text = "🏷️ القطاعات التخصصية المعتمدة"
+                textSize = 15f
                 setTextColor(Color.parseColor("#38BDF8"))
                 typeface = Typeface.DEFAULT_BOLD
                 setPadding(0, 40, 0, 20)
             }
 
-            val btnMedical = Button(this).apply {
-                text = "🏥 التوثيق الطبي والصحي (Medical Record)"
-                setOnClickListener { selectCategoryAndProceed(0) }
-            }
-
-            val btnCinematic = Button(this).apply {
-                text = "🎬 التوثيق السينمائي والإنتاجي (Cinematic Master)"
-                setOnClickListener { selectCategoryAndProceed(1) }
-            }
-
-            val btnCommercial = Button(this).apply {
-                text = "🟢 التوثيق التجاري المدفوع (Commercial)"
-                setOnClickListener { selectCategoryAndProceed(2) }
-            }
-
-            val btnProprietary = Button(this).apply {
-                text = "🔴 الملكية الخاصة والمنع (PROPRIETARY)"
-                setOnClickListener { selectCategoryAndProceed(3) }
-            }
-
             rootLayout.addView(titleTv)
             rootLayout.addView(descTv)
-
             rootLayout.addView(sectionSourceTitle)
             rootLayout.addView(btnCameraBack)
             rootLayout.addView(btnCameraFront)
             rootLayout.addView(btnGallery)
-
             rootLayout.addView(sectionCategoryTitle)
-            rootLayout.addView(btnMedical)
-            rootLayout.addView(btnCinematic)
-            rootLayout.addView(btnCommercial)
-            rootLayout.addView(btnProprietary)
+
+            // إضافة أزرار القطاعات ديناميكياً
+            sectors.forEachIndexed { index, sectorName ->
+                val btnSector = Button(this).apply {
+                    text = sectorName
+                    setOnClickListener { startDocumentationFlow(index) }
+                }
+                rootLayout.addView(btnSector)
+            }
 
             scrollView.addView(rootLayout)
             setContentView(scrollView)
 
-            // معالجة مشاركة الصورة من التطبيقات الخارجية
+            // استقبال مشاركات الصور من الواتساب والتطبيق الخارجي
             if (intent?.action == Intent.ACTION_SEND && intent.type?.startsWith("image/") == true) {
                 val streamUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
@@ -141,7 +143,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 streamUri?.let { uri ->
                     currentImageUri = uri
-                    showLicenseSelectionDialog()
+                    promptSectorSelection()
                 }
             }
         } catch (e: Exception) {
@@ -149,115 +151,38 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkPermissionAndOpenCamera(isFront: Boolean) {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(Manifest.permission.CAMERA),
-                REQUEST_CAMERA_PERMISSION
-            )
-        } else {
-            openCamera(isFront)
-        }
-    }
-
-    private fun openCamera(isFront: Boolean) {
-        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        if (isFront) {
-            intent.putExtra("android.intent.extras.CAMERA_FACING", 1)
-            intent.putExtra("android.intent.extras.LENS_FACING_FRONT", 1)
-            intent.putExtra("useFrontCamera", true)
-        } else {
-            intent.putExtra("android.intent.extras.CAMERA_FACING", 0)
-        }
-
-        try {
-            val photoFile = File.createTempFile("omnilens_capture_${System.currentTimeMillis()}", ".jpg", cacheDir)
-            cameraTempUri = FileProvider.getUriForFile(this, "$packageName.fileprovider", photoFile)
-            
-            intent.putExtra(MediaStore.EXTRA_OUTPUT, cameraTempUri)
-            intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            
-            startActivityForResult(intent, REQUEST_CAMERA_CAPTURE)
-        } catch (e: Exception) {
-            Toast.makeText(this, "تعذر فتح الكاميرا: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun openGallery() {
-        val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
-        try {
-            startActivityForResult(intent, REQUEST_GALLERY_PICK)
-        } catch (e: Exception) {
-            Toast.makeText(this, "تعذر فتح المعرض: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_CAMERA_PERMISSION) {
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(this, "تم إعطاء إذن الكاميرا، اضغط للالتقاط الآن", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "يلزم السماح بإذن الكاميرا للتمكن من التقاط الصور", Toast.LENGTH_LONG).show()
-            }
-        }
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (resultCode == RESULT_OK) {
-            when (requestCode) {
-                REQUEST_GALLERY_PICK -> {
-                    data?.data?.let { uri ->
-                        currentImageUri = uri
-                        showLicenseSelectionDialog()
-                    }
-                }
-                REQUEST_CAMERA_CAPTURE -> {
-                    cameraTempUri?.let { uri ->
-                        currentImageUri = uri
-                        showLicenseSelectionDialog()
-                    }
-                }
-            }
-        }
-    }
-
-    private fun selectCategoryAndProceed(categoryIndex: Int) {
+    private fun startDocumentationFlow(sectorIndex: Int) {
         if (currentImageUri != null) {
-            processAndDrawWatermark(currentImageUri!!, categoryIndex)
+            promptLicenseTierSelection(sectorIndex)
         } else {
-            Toast.makeText(this, "اختر أو التقط صورة أولاً لترخيصها تحت هذا القسم", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "يرجى اختيار أو التقاط صورة أولاً", Toast.LENGTH_SHORT).show()
             openGallery()
         }
     }
 
-    private fun showLicenseSelectionDialog() {
-        val licenseTypes = arrayOf(
-            "🏥 التوثيق الطبي والصحي (Medical Record)",
-            "🎬 التوثيق السينمائي والإنتاجي (Cinematic Master)",
-            "🟢 ترخيص تجاري مدفوع (Commercial)",
-            "🔴 ملكية خاصة — يمنع النشر (PROPRIETARY)",
-            "⚪ ترخيص مجاني (استخدام عام)"
-        )
-
+    private fun promptSectorSelection() {
         AlertDialog.Builder(this)
-            .setTitle("اختر قسم التوثيق — OmniLens")
-            .setItems(licenseTypes) { _, which ->
+            .setTitle("اختر القطاع التخصصي للصورة")
+            .setItems(sectors) { _, sectorIndex ->
+                promptLicenseTierSelection(sectorIndex)
+            }
+            .setNegativeButton("إلغاء", null)
+            .show()
+    }
+
+    private fun promptLicenseTierSelection(sectorIndex: Int) {
+        AlertDialog.Builder(this)
+            .setTitle("اختر نوع الترخيص — ${sectors[sectorIndex].split("(")[0]}")
+            .setItems(licenseTiers) { _, tierIndex ->
                 currentImageUri?.let { uri ->
-                    processAndDrawWatermark(uri, which)
+                    processAndDrawWatermark(uri, sectorIndex, tierIndex)
                 }
             }
             .setNegativeButton("إلغاء", null)
             .show()
     }
 
-    private fun processAndDrawWatermark(imageUri: Uri, categoryIndex: Int) {
+    private fun processAndDrawWatermark(imageUri: Uri, sectorIndex: Int, tierIndex: Int) {
         try {
             val inputStream = contentResolver.openInputStream(imageUri)
             val originalBitmap = BitmapFactory.decodeStream(inputStream)
@@ -268,7 +193,7 @@ class MainActivity : AppCompatActivity() {
                 return
             }
 
-            val bannerHeight = (originalBitmap.height * 0.13f).coerceAtLeast(160f).toInt()
+            val bannerHeight = (originalBitmap.height * 0.14f).coerceAtLeast(180f).toInt()
             val newBitmap = Bitmap.createBitmap(
                 originalBitmap.width,
                 originalBitmap.height + bannerHeight,
@@ -278,36 +203,16 @@ class MainActivity : AppCompatActivity() {
             val canvas = Canvas(newBitmap)
             canvas.drawBitmap(originalBitmap, 0f, 0f, null)
 
-            val (bgColor, headerText, detailText) = when (categoryIndex) {
-                0 -> Triple(
-                    Color.parseColor("#0284C7"),
-                    "🏥 توثيق طبي معتمد — Medical Record",
-                    "سجل طبي محمي بموجب معايير الخصوصية والتشفير الرقمي لمنظومة OmniLens"
-                )
-                1 -> Triple(
-                    Color.parseColor("#D97706"),
-                    "🎬 توثيق إنتاج سينمائي — Cinematic Master",
-                    "حقوق العرض والإخراج محفوظة لمنظومة الإنتاج الرقمي المعتمدة"
-                )
-                2 -> Triple(
-                    Color.parseColor("#15803D"),
-                    "🟢 ترخيص تجاري مدفوع — Commercial License",
-                    "حقوق التداول والاستخدام محددة بموجب ترخيص OmniLens الرقمي"
-                )
-                3 -> Triple(
-                    Color.parseColor("#B91C1C"),
-                    "🔴 ملكية خاصة — يمنع النشر أو التداول (PROPRIETARY)",
-                    "محمي جنائياً | المالك: saifsaadsalim3@gmail.com | يحظر التداول بدون إذن"
-                )
-                else -> Triple(
-                    Color.parseColor("#475569"),
-                    "⚪ ترخيص مجاني — Free Public License",
-                    "محتوى عام موثق بواسطة منصة OmniLens Engine"
-                )
+            // 1. تحديد لون خلفية الشريط بحسب مستوى الترخيص
+            val bannerColor = when (tierIndex) {
+                0 -> Color.parseColor("#15803D") // أخضر تجاري
+                1 -> Color.parseColor("#1D4ED8") // أزرق إهداء
+                2 -> Color.parseColor("#B91C1C") // أحمر ملكية خاصة
+                else -> Color.parseColor("#475569") // رمادي مجاني
             }
 
             val paint = Paint().apply { isAntiAlias = true }
-            paint.color = bgColor
+            paint.color = bannerColor
             val bannerRect = RectF(
                 0f,
                 originalBitmap.height.toFloat(),
@@ -316,9 +221,22 @@ class MainActivity : AppCompatActivity() {
             )
             canvas.drawRect(bannerRect, paint)
 
-            val timeStamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-            val sha256Hash = generateSHA256("$timeStamp-$categoryIndex-${originalBitmap.width}")
+            // 2. صياغة العنوان والتفاصيل المدمجة بين القطاع والترخيص
+            val sectorTitle = sectors[sectorIndex].split("(")[0].trim()
+            val tierTitle = licenseTiers[tierIndex].split("(")[0].trim()
+            val headerText = "$sectorTitle | $tierTitle"
 
+            val detailText = when (tierIndex) {
+                0 -> "ترخيص تجاري معتمد للأصول الإعلامية | جميع حقوق النشر والتداول محفوظة"
+                1 -> "محتوى خاص مُهدى بموجب حقوق المالك الأصلي والتأثيث الرقمي"
+                2 -> "محمي جنائياً وقانونياً | المالك: saifsaadsalim3@gmail.com | يمنع التداول"
+                else -> "ترخيص عام مجاني | موثق رقمياً عبر منظومة OmniLens Engine"
+            }
+
+            val timeStamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+            val sha256Hash = generateSHA256("$timeStamp-$sectorIndex-$tierIndex-${originalBitmap.width}")
+
+            // 3. كتابة النصوص داخل الشريط السفلي
             val textPaint = Paint().apply {
                 color = Color.WHITE
                 isAntiAlias = true
@@ -373,6 +291,71 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent.createChooser(shareIntent, "مشاركة الصورة الموثقة بشريط OmniLens"))
         } catch (e: Exception) {
             Toast.makeText(this, "تعذر مشاركة الصورة: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun checkPermissionAndOpenCamera(isFront: Boolean) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), REQUEST_CAMERA_PERMISSION)
+        } else {
+            openCamera(isFront)
+        }
+    }
+
+    private fun openCamera(isFront: Boolean) {
+        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+        if (isFront) {
+            intent.putExtra("android.intent.extras.CAMERA_FACING", 1)
+            intent.putExtra("android.intent.extras.LENS_FACING_FRONT", 1)
+            intent.putExtra("useFrontCamera", true)
+        } else {
+            intent.putExtra("android.intent.extras.CAMERA_FACING", 0)
+        }
+
+        try {
+            val photoFile = File.createTempFile("omnilens_capture_${System.currentTimeMillis()}", ".jpg", cacheDir)
+            cameraTempUri = FileProvider.getUriForFile(this, "$packageName.fileprovider", photoFile)
+            intent.putExtra(MediaStore.EXTRA_OUTPUT, cameraTempUri)
+            intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            startActivityForResult(intent, REQUEST_CAMERA_CAPTURE)
+        } catch (e: Exception) {
+            Toast.makeText(this, "تعذر فتح الكاميرا: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun openGallery() {
+        val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+        try {
+            startActivityForResult(intent, REQUEST_GALLERY_PICK)
+        } catch (e: Exception) {
+            Toast.makeText(this, "تعذر فتح المعرض: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_CAMERA_PERMISSION && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "تم منح إذن الكاميرا، اضغط مجدداً للالتقاط", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode == RESULT_OK) {
+            when (requestCode) {
+                REQUEST_GALLERY_PICK -> {
+                    data?.data?.let { uri ->
+                        currentImageUri = uri
+                        promptSectorSelection()
+                    }
+                }
+                REQUEST_CAMERA_CAPTURE -> {
+                    cameraTempUri?.let { uri ->
+                        currentImageUri = uri
+                        promptSectorSelection()
+                    }
+                }
+            }
         }
     }
 }
