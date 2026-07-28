@@ -1,8 +1,6 @@
 package com.omnilens.omniguard
 
 import android.Manifest
-import android.app.Activity
-import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.*
@@ -15,17 +13,18 @@ import android.provider.MediaStore
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.*
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.*
 
-class MainActivity : Activity() {
+class MainActivity : AppCompatActivity() {
 
     private lateinit var selectedImageView: ImageView
     private lateinit var hashTextView: TextView
@@ -35,7 +34,6 @@ class MainActivity : Activity() {
     private lateinit var settingsSummaryText: TextView
 
     private var currentBitmap: Bitmap? = null
-    private var currentMediaFile: File? = null
     private var currentHash: String = ""
     private var tempPhotoFile: File? = null
 
@@ -50,7 +48,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 🛡️ 1. حظر لقطات الشاشة وتسجيل الفيديو كلياً لحماية الخزنة بداخل التطبيق
+        // 🛡️ حظر لقطات الشاشة وتسجيل الفيديو كلياً بداخل الخزنة والتطبيق
         window.setFlags(
             WindowManager.LayoutParams.FLAG_SECURE,
             WindowManager.LayoutParams.FLAG_SECURE
@@ -69,12 +67,8 @@ class MainActivity : Activity() {
 
         val logoImage = ImageView(this).apply {
             val imageResId = resources.getIdentifier("app_icon", "drawable", packageName)
-            if (imageResId != 0) {
-                setImageResource(imageResId)
-            }
-            layoutParams = LinearLayout.LayoutParams(180, 180).apply {
-                gravity = Gravity.CENTER
-            }
+            if (imageResId != 0) setImageResource(imageResId)
+            layoutParams = LinearLayout.LayoutParams(180, 180).apply { gravity = Gravity.CENTER }
         }
 
         val titleText = TextView(this).apply {
@@ -110,18 +104,13 @@ class MainActivity : Activity() {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, 0, 0, 15)
-            }
+            ).apply { setMargins(0, 0, 0, 15) }
         }
 
         selectedImageView = ImageView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                480
-            ).apply {
-                setMargins(0, 10, 0, 15)
-            }
+                LinearLayout.LayoutParams.MATCH_PARENT, 480
+            ).apply { setMargins(0, 10, 0, 15) }
             setBackgroundColor(Color.parseColor("#1E293B"))
             scaleType = ImageView.ScaleType.FIT_CENTER
         }
@@ -173,9 +162,7 @@ class MainActivity : Activity() {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                setMargins(0, 10, 0, 15)
-            }
+            ).apply { setMargins(0, 10, 0, 15) }
         }
 
         hashTextView = TextView(this).apply {
@@ -227,7 +214,6 @@ class MainActivity : Activity() {
         scrollView.addView(rootLayout)
         setContentView(scrollView)
 
-        // 🔍 فحص الأذونات وقراءة سجل الخزنة فور التشغيل
         if (checkPermissions()) {
             loadSavedVaultHistory()
         }
@@ -279,9 +265,7 @@ class MainActivity : Activity() {
             } else {
                 tempPhotoFile = File.createTempFile("JPEG_${timeStamp}_", ".jpg", storageDir)
                 val photoURI: Uri = FileProvider.getUriForFile(
-                    this,
-                    "com.omnilens.omniguard.provider",
-                    tempPhotoFile!!
+                    this, "com.omnilens.omniguard.provider", tempPhotoFile!!
                 )
                 val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
                     putExtra(MediaStore.EXTRA_OUTPUT, photoURI)
@@ -310,9 +294,7 @@ class MainActivity : Activity() {
                 CAMERA_REQUEST_CODE -> {
                     tempPhotoFile?.let { file ->
                         val bitmap = BitmapFactory.decodeFile(file.absolutePath)
-                        if (bitmap != null) {
-                            processCapturedBitmap(bitmap)
-                        }
+                        if (bitmap != null) processCapturedBitmap(bitmap)
                     }
                 }
                 GALLERY_REQUEST_CODE -> {
@@ -320,9 +302,7 @@ class MainActivity : Activity() {
                     imageUri?.let { uri ->
                         val inputStream = contentResolver.openInputStream(uri)
                         val bitmap = BitmapFactory.decodeStream(inputStream)
-                        if (bitmap != null) {
-                            processCapturedBitmap(bitmap)
-                        }
+                        if (bitmap != null) processCapturedBitmap(bitmap)
                     }
                 }
                 VIDEO_REQUEST_CODE -> {
@@ -337,13 +317,10 @@ class MainActivity : Activity() {
     }
 
     private fun processCapturedBitmap(bitmap: Bitmap) {
-        // 🎨 إضافة طبقة التوثيق والمائية بدقة عالية ومنع تشوه الخطوط
         val watermarked = addOmniLensWatermarkToBitmap(bitmap)
         currentBitmap = watermarked
         selectedImageView.setImageBitmap(watermarked)
 
-        // 🔐 حساب بصمة SHA-256 للملف
-        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
         currentHash = calculateBitmapSHA256(watermarked)
 
         hashTextView.text = "🔑 SHA-256 Digest:\n$currentHash"
@@ -351,14 +328,12 @@ class MainActivity : Activity() {
         statusTextView.text = "✅ تم تشفير البصمة وتطبيق طبقة التوثيق"
     }
 
-    // 🖌️ رسم الطبقة المائية وشريط التوثيق الأحمر بدقة عالية بدون رموز مكسورة
     private fun addOmniLensWatermarkToBitmap(srcBitmap: Bitmap): Bitmap {
         val mutableBitmap = srcBitmap.copy(Bitmap.Config.ARGB_8888, true)
         val canvas = Canvas(mutableBitmap)
         val width = canvas.width
         val height = canvas.height
 
-        // 1. رسم النمط المائل الخفي (PROTECTED OMNILENS)
         val watermarkPaint = Paint().apply {
             color = Color.argb(45, 255, 255, 255)
             textSize = (width * 0.042f).coerceAtLeast(30f)
@@ -378,16 +353,14 @@ class MainActivity : Activity() {
         }
         canvas.restore()
 
-        // 2. رسم الشريط السفلي للتوثيق الإداري والمشاهير
         val barHeight = (height * 0.12f).coerceAtLeast(120f)
         val barPaint = Paint().apply {
-            color = Color.parseColor("#800000") // أحمر عنابي دافئ ومحترف
+            color = Color.parseColor("#800000")
             style = Paint.Style.FILL
         }
         val barRect = RectF(0f, height - barHeight, width.toFloat(), height.toFloat())
         canvas.drawRect(barRect, barPaint)
 
-        // 3. كتابة بيانات التوثيق الرسمية بالإنجليزية المنظمة لمنع التشفير المكسور
         val ownerName = "SAIF SAAD SALIM"
         val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
 
@@ -432,29 +405,21 @@ class MainActivity : Activity() {
         val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
         val fileName = "OMNI_$timeStamp.jpg"
 
-        // حفظ في مجلد الاستوديو العام DCIM/OmniLens
         val dcimDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM)
         val omniFolder = File(dcimDir, "OmniLens")
-        if (!omniFolder.exists()) {
-            omniFolder.mkdirs()
-        }
+        if (!omniFolder.exists()) omniFolder.mkdirs()
 
         val galleryFile = File(omniFolder, fileName)
         FileOutputStream(galleryFile).use { out ->
             bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
         }
 
-        // إعلام استوديو الجهاز بالملف الجديد
         MediaScannerConnection.scanFile(this, arrayOf(galleryFile.absolutePath), null, null)
-
         Toast.makeText(this, "💾 تم الحفظ بنجاح في خزنة OmniLens والمستندات", Toast.LENGTH_LONG).show()
         btnSave.isEnabled = false
-
-        // إعادة تحميل سجل الخزنة
         loadSavedVaultHistory()
     }
 
-    // 📂 قراءة سجل الخزنة واستعراض كافة الصور السابقة
     private fun loadSavedVaultHistory() {
         historyLayout.removeAllViews()
 
@@ -463,9 +428,7 @@ class MainActivity : Activity() {
         val internalFolder = filesDir
 
         val allFiles = mutableListOf<File>()
-        if (omniFolder.exists()) {
-            omniFolder.listFiles()?.let { allFiles.addAll(it) }
-        }
+        if (omniFolder.exists()) omniFolder.listFiles()?.let { allFiles.addAll(it) }
         if (internalFolder.exists()) {
             internalFolder.listFiles()?.filter { it.extension in listOf("jpg", "jpeg", "png", "mp4") }?.let { allFiles.addAll(it) }
         }
@@ -492,9 +455,7 @@ class MainActivity : Activity() {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    setMargins(0, 0, 0, 10)
-                }
+                ).apply { setMargins(0, 0, 0, 10) }
                 setOnClickListener { openFileInViewer(file) }
             }
 
@@ -504,9 +465,7 @@ class MainActivity : Activity() {
                 setPadding(0, 0, 15, 0)
             }
 
-            val infoLayout = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-            }
+            val infoLayout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
             val nameText = TextView(this).apply {
                 text = file.name
@@ -524,10 +483,8 @@ class MainActivity : Activity() {
 
             infoLayout.addView(nameText)
             infoLayout.addView(dateText)
-
             card.addView(iconText)
             card.addView(infoLayout)
-
             historyLayout.addView(card)
         }
     }
