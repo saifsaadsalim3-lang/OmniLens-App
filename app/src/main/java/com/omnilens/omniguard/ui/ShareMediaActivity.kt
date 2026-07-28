@@ -1,85 +1,61 @@
-package com.omnilens.app
+package com.omnilens.omniguard.ui
 
-import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.provider.MediaStore
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.FileProvider
+import java.io.File
 
 class ShareMediaActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // الشاشة الرئيسية للبرنامج عند الفتح المباشر
-        showMainAppHub()
-    }
 
-    private fun showMainAppHub() {
-        val hubOptions = arrayOf(
-            "📷 التقاط صورة (الكاميرا الخلفية)",
-            "🤳 التقاط صورة (الكاميرا الأمامية)",
-            "📁 اختيار ملف من المعرض",
-            "🛡️ توثيق ترخيص OmniLens (الأكواد الأربعة)"
-        )
-
-        AlertDialog.Builder(this)
-            .setTitle("منظومة OmniLens Engine — المركز الرئيسي")
-            .setItems(hubOptions) { _, which ->
-                when (which) {
-                    0 -> openCamera(isFront = false)
-                    1 -> openCamera(isFront = true)
-                    2 -> openGallery()
-                    3 -> showLicenseSelectionDialog()
-                }
-            }
-            .setOnCancelListener { finish() }
-            .show()
-    }
-
-    private fun showLicenseSelectionDialog() {
-        val licenseTypes = arrayOf(
-            "🟢 ترخيص تجاري مدفوع",
-            "🔵 إهداء خاص",
-            "🔴 ملكية خاصة (يمنع النشر)",
-            "⚪ ترخيص مجاني (استخدام عام)"
-        )
-
-        AlertDialog.Builder(this)
-            .setTitle("اختر نوع التوثيق — OmniLens")
-            .setItems(licenseTypes) { _, which ->
-                val selectedType = licenseTypes[which]
-                Toast.makeText(this, "تم اعتماد: $selectedType", Toast.LENGTH_LONG).show()
-                finish()
-            }
-            .setNegativeButton("إلغاء") { _, _ -> showMainAppHub() }
-            .show()
-    }
-
-    private fun openCamera(isFront: Boolean) {
-        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        if (isFront) {
-            intent.putExtra("android.intent.extras.CAMERA_FACING", 1)
-            intent.putExtra("android.intent.extras.LENS_FACING_FRONT", 1)
-            intent.putExtra("useFrontCamera", true)
-        } else {
-            intent.putExtra("android.intent.extras.CAMERA_FACING", 0)
+        val filePath = intent.getStringExtra("FILE_PATH")
+        if (filePath.isNullOrEmpty()) {
+            Toast.makeText(this, "تعذر تحديد مسار الملف للمشاركة", Toast.LENGTH_SHORT).show()
+            finish()
+            return
         }
-        try {
-            startActivity(intent)
-        } catch (e: Exception) {
-            Toast.makeText(this, "تعذر فتح الكاميرا: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+
+        val file = File(filePath)
+        if (!file.exists()) {
+            Toast.makeText(this, "الملف غير موجود في الخزنة", Toast.LENGTH_SHORT).show()
+            finish()
+            return
         }
+
+        shareFile(file)
     }
 
-    private fun openGallery() {
-        val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+    private fun shareFile(file: File) {
         try {
-            startActivity(intent)
+            val uri: Uri = FileProvider.getUriForFile(
+                this,
+                "com.omnilens.omniguard.provider",
+                file
+            )
+
+            val mimeType = if (file.name.endsWith(".mp4", ignoreCase = true)) "video/*" else "image/*"
+
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = mimeType
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, "وسائط موثقة عبر OmniLens")
+                putExtra(
+                    Intent.EXTRA_TEXT,
+                    "تم توثيق هذه الوسائط وحمايتها بواسطة منظومة OmniLens Ecosystem.\nرقم التوثيق: OMNILENS-IP-INV-SAIF-2026"
+                )
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+
+            startActivity(Intent.createChooser(shareIntent, "مشاركة الوسائط الموثقة عبر:"))
+            finish()
         } catch (e: Exception) {
-            Toast.makeText(this, "تعذر فتح المعرض: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "حدث خطأ أثناء المشاركة: ${e.message}", Toast.LENGTH_LONG).show()
+            finish()
         }
     }
 }
