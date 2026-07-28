@@ -1,24 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 1️⃣ صلاحيات الكاميرا، الفيديو، الصوت والإنترنت -->
+    <!-- تصاريح الكاميرا والصوت -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- تصاريح قراءة وسائط الصور والفيديوهات (أندرويد 13 وما فوق API 33+) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+
+    <!-- تصاريح التخزين لأجهزة أندرويد القديمة (API 32 وما دون) -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.any" />
 
     <application
         android:allowBackup="true"
         android:icon="@drawable/app_icon"
+        android:roundIcon="@drawable/app_icon"
         android:label="OmniLens"
         android:supportsRtl="true"
-        android:theme="@style/Theme.AppCompat.NoActionBar">
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
-        <!-- 2️⃣ مزود الملفات الآمن الصريح لمنع أخطاء التخصيص -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- موفر الملفات الحصري لمشاركة الوسائط بأمان -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="com.omnilens.omniguard.provider"
@@ -28,16 +42,6 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
-
-        <!-- النشاط الرئيسي للتطبيق -->
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
 
     </application>
 
