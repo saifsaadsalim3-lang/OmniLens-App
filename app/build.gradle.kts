@@ -37,6 +37,8 @@ android {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
+    // 🛡️ السطر المضاف لحل مشكلة Unresolved reference: AppCompatActivity والـ Context
+    implementation("androidx.appcompat:appcompat:1.6.1")
     
     val cameraVersion = "1.3.4"
     implementation("androidx.camera:camera-core:$cameraVersion")
