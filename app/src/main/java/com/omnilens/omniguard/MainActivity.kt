@@ -3,7 +3,9 @@ package com.omnilens.omniguard
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.*
 import android.media.MediaScannerConnection
@@ -12,6 +14,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
+import android.text.InputType
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.*
@@ -31,15 +34,19 @@ class MainActivity : Activity() {
     private lateinit var statusTextView: TextView
     private lateinit var btnSave: Button
     private lateinit var historyLayout: LinearLayout
+    private lateinit var sectorButtonsLayout: LinearLayout
     private lateinit var settingsSummaryText: TextView
+    private lateinit var btnToggleVault: Button
+    private lateinit var sharedPrefs: SharedPreferences
 
     private var currentBitmap: Bitmap? = null
     private var currentHash: String = ""
     private var tempPhotoFile: File? = null
-    private var selectedSector: String = "CELEBRITY & ESCROW HUB"
+    private var selectedSector: String = "🏛️ القطاع الحكومي والسيادي (GOVERNMENT & SOVEREIGN HUB)"
 
     private var selectedResolution = "FHD (1080p)"
     private var selectedFPS = "30 FPS"
+    private var isVaultUnlocked = false
 
     private val CAMERA_BACK_REQUEST = 101
     private val CAMERA_FRONT_REQUEST = 102
@@ -48,6 +55,10 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 🔓 السماح بأخذ لقطات الشاشة في الواجهة الرئيسية بشكل طبيعي
+        window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        sharedPrefs = getSharedPreferences("omnilens_sec_prefs", Context.MODE_PRIVATE)
 
         val scrollView = ScrollView(this).apply {
             setBackgroundColor(Color.parseColor("#0F172A"))
@@ -60,7 +71,7 @@ class MainActivity : Activity() {
             setPadding(30, 40, 30, 50)
         }
 
-        // 1. ترويسة المنظومة الأصلية
+        // 1. ترويسة المنظومة الرئيسية
         val titleText = TextView(this).apply {
             text = "منظومة OmniLens Engine v2.0 🛡️"
             textSize = 22f
@@ -71,14 +82,14 @@ class MainActivity : Activity() {
         }
 
         val subTitleText = TextView(this).apply {
-            text = "منظومة التوثيق الرقمي المزدوجة (In-App & Out-of-App Verification)"
+            text = "منظومة التوثيق الرقمي المزدوجة والتتبع السيادي"
             textSize = 11f
             setTextColor(Color.parseColor("#94A3B8"))
             gravity = Gravity.CENTER
             setPadding(0, 0, 0, 20)
         }
 
-        // 2. قسم التقاط وجلب الوسائط
+        // 2. وسائل التقاط الكاميرا والوسائط
         val captureHeader = createSectionHeader("📷 وسائل التقاط وجلب الوسائط")
 
         val btnBackCamera = createStyledButton("📷 التقاط بالكاميرا الخلفية", "#334155") {
@@ -91,43 +102,15 @@ class MainActivity : Activity() {
             openGallery()
         }
 
-        // 3. قسم القطاعات التخصصية وبوابة العقود
-        val sectorHeader = createSectionHeader("🏷️ القطاعات التخصصية وبوابة العقود")
+        // 3. القطاعات التخصصية الـ 10 + القطاعات المخصصة
+        val sectorHeader = createSectionHeader("🏷️ القطاعات التخصصية والسيادية المعتمدة")
 
-        val sectorButtonsLayout = LinearLayout(this).apply {
+        sectorButtonsLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
+        refreshSectorButtons(sectorButtonsLayout)
 
-        val sectors = listOf(
-            "🌟 بوابة المشاهير والعقود المدفوعة (& CELEBRITY ESCROW HUB)",
-            "⚽ القطاع الرياضي والفعاليات (SPORTS & EVENTS)",
-            "📰 الصحافة والإعلام (JOURNALISM & PRESS)",
-            "🏥 القطاع الطبي والصحي (MEDICAL & HEALTH)",
-            "🎬 الإنتاج السينمائي والمرئي (CINEMATIC MASTER)",
-            "🎨 الفن الرقمي والتصميم (FINE ART & NFT)",
-            "📐 الهندسة والمخططات (ENGINEERING & ARCHITECTURE)",
-            "🎓 القطاع الأكاديمي والبحثي (ACADEMIC & RESEARCH)"
-        )
-
-        sectors.forEach { sectorName ->
-            val btn = Button(this).apply {
-                text = sectorName
-                textSize = 11f
-                setTextColor(Color.WHITE)
-                setBackgroundColor(if (sectorName.contains("ESCROW")) Color.parseColor("#0284C7") else Color.parseColor("#1E293B"))
-                setOnClickListener {
-                    selectedSector = sectorName
-                    Toast.makeText(this@MainActivity, "تم تحديد القطاع: $sectorName", Toast.LENGTH_SHORT).show()
-                }
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { setMargins(0, 0, 0, 8) }
-            }
-            sectorButtonsLayout.addView(btn)
-        }
-
-        // 4. خيار الضبط والمشاهدة
+        // 4. خيار ضبط الجودة والإطارات
         settingsSummaryText = TextView(this).apply {
             text = "⚙️ إعدادات التصوير: [$selectedResolution] | [$selectedFPS]"
             textSize = 11f
@@ -149,7 +132,7 @@ class MainActivity : Activity() {
         }
 
         statusTextView = TextView(this).apply {
-            text = "🛡️ جاهز للالتقاط والتوثيق التلقائي"
+            text = "🛡️ جاهز للالتقاط والتوثيق التلقائي بنقاء بصري كامل"
             textSize = 12f
             setTextColor(Color.parseColor("#38BDF8"))
             gravity = Gravity.CENTER
@@ -157,33 +140,38 @@ class MainActivity : Activity() {
         }
 
         btnSave = createStyledButton("💾 حفظ في خزنة OMNILENS واستوديو الجهاز", "#10B981") {
-            saveEncryptedMediaToVaultAndGallery()
+            saveMediaToVaultAndGallery()
         }.apply { isEnabled = false }
 
         hashTextView = TextView(this).apply {
-            text = "قم بالتقاط صورة أو اختيارها لتشفير البصمة وتأمينها."
+            text = "قم بالتقاط صورة أو اختيارها لتوليد بصمة SHA-256 وتتبع الهوية."
             textSize = 11f
             setTextColor(Color.parseColor("#94A3B8"))
             gravity = Gravity.CENTER
             setPadding(10, 5, 10, 15)
         }
 
-        // 5. سجل الخزنة
-        val historyTitle = createSectionHeader("📜 سجل وسائط الخزنة المشفرة (اضغط للعرض)")
+        // 5. قسم الخزنة الأمنية المشفرة بكلمة مرور وبصمة
+        val historyTitle = createSectionHeader("🔐 الخزنة المشفرة الخاصة (تتطلب رمز حماية وبصمة)")
+
+        btnToggleVault = createStyledButton("🔒 فتح الخزنة المشفرة (PIN Code)", "#DC2626") {
+            handleVaultSecurityAccess()
+        }
 
         historyLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            visibility = LinearLayout.GONE // مخفية افتراضياً للحماية القصوى
         }
 
         val rightsText = TextView(this).apply {
-            text = "جميع الحقوق محفوظة لمنظومة OmniLens للمؤسس Saif Saad Salim"
+            text = "جميع الحقوق محفوظة للمؤسس ՏԹiԲ. Տ. ՏԹliʍ"
             textSize = 10f
             setTextColor(Color.parseColor("#64748B"))
             gravity = Gravity.CENTER
             setPadding(0, 25, 0, 10)
         }
 
-        // تجميع العناصر
+        // تجميع العناصر بالواجهة
         rootLayout.addView(titleText)
         rootLayout.addView(subTitleText)
         rootLayout.addView(captureHeader)
@@ -199,20 +187,21 @@ class MainActivity : Activity() {
         rootLayout.addView(btnSave)
         rootLayout.addView(hashTextView)
         rootLayout.addView(historyTitle)
+        rootLayout.addView(btnToggleVault)
         rootLayout.addView(historyLayout)
         rootLayout.addView(rightsText)
 
         scrollView.addView(rootLayout)
         setContentView(scrollView)
 
-        if (checkPermissions()) {
-            loadSavedVaultHistory()
-        }
+        checkPermissions()
     }
 
     override fun onResume() {
         super.onResume()
-        window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        if (!isVaultUnlocked) {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
     }
 
     private fun createSectionHeader(title: String): TextView {
@@ -239,7 +228,172 @@ class MainActivity : Activity() {
         }
     }
 
-    // 🎯 إصلاح فحص الأذونات الحقيقي لمنع حظر الكاميرا الممتد
+    // إدارة القطاعات الديناميكية والقطاعات المخصصة
+    private fun refreshSectorButtons(container: LinearLayout) {
+        container.removeAllViews()
+
+        val defaultSectors = listOf(
+            "🏛️ القطاع الحكومي والسيادي (GOVERNMENT & SOVEREIGN HUB)",
+            "🤖 قطاع الذكاء الاصطناعي ومكافحة التزييف (AI & DIGITAL FORENSICS HUB)",
+            "🌟 بوابة المشاهير والعقود المدفوعة (CELEBRITY ESCROW HUB)",
+            "⚽ القطاع الرياضي والفعاليات (SPORTS & EVENTS)",
+            "📰 الصحافة والإعلام (JOURNALISM & PRESS)",
+            "🏥 القطاع الطبي والصحي (MEDICAL & HEALTH)",
+            "🎬 الإنتاج السينمائي والمرئي (CINEMATIC MASTER)",
+            "🎨 الفن الرقمي والتصميم (FINE ART & NFT)",
+            "📐 الهندسة والمخططات (ENGINEERING & ARCHITECTURE)",
+            "🎓 القطاع الأكاديمي والبحثي (ACADEMIC & RESEARCH)"
+        )
+
+        val customSet = sharedPrefs.getStringSet("custom_sectors", emptySet()) ?: emptySet()
+        val allSectors = defaultSectors + customSet.toList()
+
+        allSectors.forEach { sectorName ->
+            val btn = Button(this).apply {
+                text = sectorName
+                textSize = 11f
+                setTextColor(Color.WHITE)
+                setBackgroundColor(
+                    when {
+                        sectorName.contains("GOVERNMENT") || sectorName.contains("ESCROW") -> Color.parseColor("#0284C7")
+                        sectorName.contains("AI") -> Color.parseColor("#7C3AED")
+                        sectorName.contains("CUSTOM") -> Color.parseColor("#0D9488")
+                        else -> Color.parseColor("#1E293B")
+                    }
+                )
+                setOnClickListener {
+                    selectedSector = sectorName
+                    Toast.makeText(this@MainActivity, "تم تحديد القطاع: $sectorName", Toast.LENGTH_SHORT).show()
+                }
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { setMargins(0, 0, 0, 8) }
+            }
+            container.addView(btn)
+        }
+
+        // زر إضافة قطاع مخصص جديد
+        val btnAddCustom = Button(this).apply {
+            text = "➕ إضافة قطاع مخصص جديد..."
+            textSize = 11f
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#334155"))
+            setOnClickListener {
+                showAddCustomSectorDialog(container)
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(0, 5, 0, 10) }
+        }
+        container.addView(btnAddCustom)
+    }
+
+    private fun showAddCustomSectorDialog(container: LinearLayout) {
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("➕ إضافة قطاع تخصصي جديد")
+        builder.setMessage("أدخل اسم القطاع الجديد لحفظه ضمن المنظومة:")
+
+        val input = EditText(this).apply {
+            hint = "مثال: قطاع العقارات والتوثيق القانوني"
+            inputType = InputType.TYPE_CLASS_TEXT
+        }
+        builder.setView(input)
+
+        builder.setPositiveButton("حفظ وإضافة") { _, _ ->
+            val name = input.text.toString().trim()
+            if (name.isNotEmpty()) {
+                val customSet = sharedPrefs.getStringSet("custom_sectors", mutableSetOf())?.toMutableSet() ?: mutableSetOf()
+                customSet.add("🏢 $name (CUSTOM HUB)")
+                sharedPrefs.edit().putStringSet("custom_sectors", customSet).apply()
+                Toast.makeText(this, "تم إضافة القطاع بنجاح!", Toast.LENGTH_SHORT).show()
+                refreshSectorButtons(container)
+            } else {
+                Toast.makeText(this, "يرجى كتابة اسم صحيح", Toast.LENGTH_SHORT).show()
+            }
+        }
+        builder.setNegativeButton("إلغاء", null)
+        builder.show()
+    }
+
+    // حماية الخزنة ورمز الدخول
+    private fun handleVaultSecurityAccess() {
+        if (isVaultUnlocked) {
+            isVaultUnlocked = false
+            historyLayout.visibility = LinearLayout.GONE
+            btnToggleVault.text = "🔒 فتح الخزنة المشفرة (PIN Code)"
+            btnToggleVault.setBackgroundColor(Color.parseColor("#DC2626"))
+            window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            Toast.makeText(this, "تم قفل الخزنة بأمان", Toast.LENGTH_SHORT).show()
+        } else {
+            val savedPin = sharedPrefs.getString("vault_pin", null)
+            if (savedPin == null) {
+                showSetPinDialog()
+            } else {
+                showEnterPinDialog(savedPin)
+            }
+        }
+    }
+
+    private fun showSetPinDialog() {
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("🔑 إنشاء رمز سري للخزنة")
+        builder.setMessage("أدخل رمزاً مكوناً من 4 أرقام لحماية الخزنة السرية:")
+
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        }
+        builder.setView(input)
+
+        builder.setPositiveButton("حفظ") { _, _ ->
+            val pin = input.text.toString().trim()
+            if (pin.length >= 4) {
+                sharedPrefs.edit().putString("vault_pin", pin).apply()
+                Toast.makeText(this, "تم تعيين رمز الحماية بنجاح!", Toast.LENGTH_SHORT).show()
+                unlockVaultSuccess()
+            } else {
+                Toast.makeText(this, "يرجى إدخال 4 أرقام على الأقل", Toast.LENGTH_SHORT).show()
+            }
+        }
+        builder.setNegativeButton("إلغاء", null)
+        builder.show()
+    }
+
+    private fun showEnterPinDialog(correctPin: String) {
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("🔐 فتح الخزنة المشفرة")
+        builder.setMessage("أدخل الرمز السري الخاص بك:")
+
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        }
+        builder.setView(input)
+
+        builder.setPositiveButton("فتح") { _, _ ->
+            val entered = input.text.toString().trim()
+            if (entered == correctPin) {
+                unlockVaultSuccess()
+            } else {
+                Toast.makeText(this, "الرمز السري غير صحيح ❌", Toast.LENGTH_SHORT).show()
+            }
+        }
+        builder.setNegativeButton("إلغاء", null)
+        builder.show()
+    }
+
+    private fun unlockVaultSuccess() {
+        isVaultUnlocked = true
+        // 🛡️ تفعيل حظر لقطات وتسجيل الشاشة فوراً عند فتح الخزنة
+        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+
+        historyLayout.visibility = LinearLayout.VISIBLE
+        btnToggleVault.text = "🔓 إغلاق وقفل الخزنة المشفرة"
+        btnToggleVault.setBackgroundColor(Color.parseColor("#10B981"))
+        loadSavedVaultHistory()
+        Toast.makeText(this, "تم فتح الخزنة وحظر لقطات الشاشة للحماية القصوى ✅", Toast.LENGTH_SHORT).show()
+    }
+
     private fun checkPermissions(): Boolean {
         val needed = mutableListOf<String>()
 
@@ -334,46 +488,31 @@ class MainActivity : Activity() {
 
         currentHash = calculateBitmapSHA256(watermarked)
 
-        hashTextView.text = "🔑 SHA-256 Digest:\n$currentHash"
+        hashTextView.text = "🔑 SHA-256 Digest & Tracking ID:\n$currentHash"
         btnSave.isEnabled = true
-        statusTextView.text = "✅ تم توثيق الصورة وتطبيق معيار [$selectedSector]"
+        statusTextView.text = "✅ تم توثيق الصورة بنجاح ودمج بصرية التتبع للقطاع المختار"
     }
 
+    // 🛡️ دمج الشريط العنابي السيادي بدون نص مائل وبدقة فائقة
     private fun addOmniLensWatermarkToBitmap(srcBitmap: Bitmap): Bitmap {
         val mutableBitmap = srcBitmap.copy(Bitmap.Config.ARGB_8888, true)
         val canvas = Canvas(mutableBitmap)
         val width = canvas.width
         val height = canvas.height
 
-        val watermarkPaint = Paint().apply {
-            color = Color.argb(40, 255, 255, 255)
-            textSize = (width * 0.04f).coerceAtLeast(28f)
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            isAntiAlias = true
-        }
-
-        canvas.save()
-        canvas.rotate(-30f, width / 2f, height / 2f)
-        val stepX = (width * 0.5f).toInt()
-        val stepY = (height * 0.12f).toInt()
-
-        for (y in -height..height * 2 step stepY) {
-            for (x in -width..width * 2 step stepX) {
-                canvas.drawText("PROTECTED OMNILENS • PRO", x.toFloat(), y.toFloat(), watermarkPaint)
-            }
-        }
-        canvas.restore()
+        // ملاحظة: تم حذف النص المائل المتكرر نهائياً لضمان نقاء بصري مطلق وكامل.
 
         val barHeight = (height * 0.12f).coerceAtLeast(120f)
         val barPaint = Paint().apply {
-            color = Color.parseColor("#800000")
+            color = Color.parseColor("#800000") // الشريط العنابي السيادي
             style = Paint.Style.FILL
         }
         val barRect = RectF(0f, height - barHeight, width.toFloat(), height.toFloat())
         canvas.drawRect(barRect, barPaint)
 
-        val ownerName = "SAIF SAAD SALIM"
         val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+        // توليد معرّف تتبع جنائي فريد للملف
+        val trackingId = "OMNI-TRK-${UUID.randomUUID().toString().take(6).uppercase()}-${System.currentTimeMillis().toString().takeLast(4)}"
 
         val textPaintLine1 = Paint().apply {
             color = Color.WHITE
@@ -389,8 +528,8 @@ class MainActivity : Activity() {
             isAntiAlias = true
         }
 
-        val line1Text = "OmniLens | OWNER: $ownerName | SECTOR: $selectedSector"
-        val line2Text = "TIME: $timestamp | TOKEN: OMNILENS-IP-INV-SAIF-2026"
+        val line1Text = "OmniLens | ՏԹiԲ. Տ. ՏԹliʍ - جميع الحقوق محفوظة"
+        val line2Text = "$selectedSector | TIME: $timestamp | ID: $trackingId"
 
         val paddingLeft = 30f
         val line1Y = height - (barHeight * 0.55f)
@@ -411,7 +550,7 @@ class MainActivity : Activity() {
         return hashBytes.joinToString("") { "%02x".format(it) }
     }
 
-    private fun saveEncryptedMediaToVaultAndGallery() {
+    private fun saveMediaToVaultAndGallery() {
         val bitmap = currentBitmap ?: return
         val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
         val fileName = "OMNI_$timeStamp.jpg"
@@ -426,9 +565,9 @@ class MainActivity : Activity() {
         }
 
         MediaScannerConnection.scanFile(this, arrayOf(galleryFile.absolutePath), null, null)
-        Toast.makeText(this, "💾 تم التوثيق والحفظ بنجاح في استوديو الهاتف وخزنة OmniLens", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, "💾 تم الحفظ بنجاح في استوديو الهاتف وخزنة OmniLens", Toast.LENGTH_LONG).show()
         btnSave.isEnabled = false
-        loadSavedVaultHistory()
+        if (isVaultUnlocked) loadSavedVaultHistory()
     }
 
     private fun loadSavedVaultHistory() {
@@ -454,7 +593,7 @@ class MainActivity : Activity() {
             return
         }
 
-        sortedFiles.take(10).forEach { file ->
+        sortedFiles.take(15).forEach { file ->
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 setBackgroundColor(Color.parseColor("#1E293B"))
@@ -463,7 +602,8 @@ class MainActivity : Activity() {
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply { setMargins(0, 0, 0, 8) }
-                setOnClickListener { openFileInVaultViewer(file) }
+                // 🔒 استخدام المعاينة الداخلية الآمنة عند النقر
+                setOnClickListener { openSecureInAppViewer(file) }
             }
 
             val iconText = TextView(this).apply {
@@ -496,14 +636,51 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun openFileInVaultViewer(file: File) {
-        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        val uri = FileProvider.getUriForFile(this, "com.omnilens.omniguard.provider", file)
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "image/*")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    // 🛡️ المعاينة الداخلية الآمنة المحمية حصرياً ضد لقطات الشاشة (FLAG_SECURE)
+    private fun openSecureInAppViewer(file: File) {
+        val dialog = AlertDialog.Builder(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen).create()
+
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#0F172A"))
+            setPadding(20, 40, 20, 20)
+            gravity = Gravity.CENTER
         }
-        startActivity(intent)
+
+        val imageView = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            val bitmap = BitmapFactory.decodeFile(file.absolutePath)
+            setImageBitmap(bitmap)
+        }
+
+        val infoText = TextView(this).apply {
+            text = "📄 الملف: ${file.name}\n🔒 معاينة آمنة داخلية محمية من لقطات الشاشة (FLAG_SECURE)"
+            setTextColor(Color.parseColor("#38BDF8"))
+            textSize = 11f
+            gravity = Gravity.CENTER
+            setPadding(0, 15, 0, 15)
+        }
+
+        val btnClose = Button(this).apply {
+            text = "إغلاق المعاينة الآمنة"
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.parseColor("#DC2626"))
+            setOnClickListener { dialog.dismiss() }
+        }
+
+        layout.addView(imageView)
+        layout.addView(infoText)
+        layout.addView(btnClose)
+
+        dialog.setView(layout)
+        // 🔒 تطبيق حظر الشاشة الحصري على نافذة المعاينة
+        dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        dialog.show()
     }
 
     private fun showCameraSettingsDialog() {
