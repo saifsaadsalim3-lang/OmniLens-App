@@ -1,0 +1,34 @@
+    // 🌟 1. دالة إنشاء الشعار البصري المباشر (ضمان الظهور والنبض)
+    private fun createCustomLogoBitmap(): Bitmap {
+        val bitmap = Bitmap.createBitmap(140, 140, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val paint = Paint().apply { isAntiAlias = true }
+
+        // إطار الدرع الأزرق المضيء
+        paint.color = Color.parseColor("#38BDF8")
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 7f
+        canvas.drawCircle(70f, 70f, 58f, paint)
+
+        // جسم القفل والعدسة
+        paint.color = Color.parseColor("#38BDF8")
+        paint.style = Paint.Style.FILL
+        canvas.drawRect(50f, 65f, 90f, 100f, paint)
+        canvas.drawCircle(70f, 52f, 15f, paint)
+
+        return bitmap
+    }
+
+    // 🎥 2. دالة تسجيل مقاطع الفيديو الموثقة مع الشريط السيادي
+    private fun launchVideoCamera() {
+        if (!checkPermissions()) return
+        try {
+            val intent = Intent(MediaStore.ACTION_VIDEO_CAPTURE).apply {
+                putExtra(MediaStore.EXTRA_DURATION_LIMIT, 30) // حد أقصى 30 ثانية للتوثيق
+                putExtra(MediaStore.EXTRA_VIDEO_QUALITY, 1)    // جودة عالية
+            }
+            startActivityForResult(intent, 300)
+        } catch (e: Exception) {
+            Toast.makeText(this, "تعذر فتح كاميرا الفيديو: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
