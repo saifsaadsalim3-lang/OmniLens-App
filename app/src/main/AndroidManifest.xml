@@ -1,17 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- أذونات الكاميرا والصوت -->
+    <!-- الأذونات المعتمدة -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-
-    <!-- أذونات الوسائط لجميع إصدارات أندرويد -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 
-    <uses-feature android:name="android.hardware.camera.any" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
     <application
         android:allowBackup="true"
@@ -21,7 +20,7 @@
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
-        <!-- 1. الواجهة الرئيسية -->
+        <!-- الواجهة الرئيسية v2.0 -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -31,12 +30,12 @@
             </intent-filter>
         </activity>
 
-        <!-- 2. واجهة المشاركة الموثقة -->
+        <!-- واجهة المشاركة -->
         <activity
             android:name=".ui.ShareMediaActivity"
             android:exported="false" />
 
-        <!-- 3. موفر الملفات الحصري للخزنة -->
+        <!-- موفر الملفات المعالج لخطأ فتح الكاميرا -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="com.omnilens.omniguard.provider"
