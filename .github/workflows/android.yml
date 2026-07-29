@@ -21,40 +21,68 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    - name: Grant Execute Permission for Gradlew
-      run: chmod +x gradlew
+    - name: Setup Gradle Engine
+      uses: gradle/actions/setup-gradle@v3
 
-    - name: Run Auto-Injector (حقن التحديثات تلقائياً)
+    - name: Run Smart Auto-Injector (الحقن الذكي الآلي)
       run: |
         python3 -c "
         import os
-        patch_file = 'patch.txt'
+
         target_file = 'app/src/main/java/com/omnilens/omniguard/MainActivity.kt'
-        
-        if os.path.exists(patch_file) and os.path.exists(target_file):
-            print('🔍 تم العثور على ملف الحقن patch.txt.. جاري الدمج...')
-            with open(patch_file, 'r', encoding='utf-8') as f:
-                patch_code = f.read()
+        patch_file = 'patch.txt'
+
+        if os.path.exists(target_file):
             with open(target_file, 'r', encoding='utf-8') as f:
-                main_code = f.read()
-            
-            # استبدال أيقونة الشعار الافتراضية بالدالة الرسمية إذا وجدت
-            if 'android.R.drawable.ic_lock_lock' in main_code:
-                main_code = main_code.replace('android.R.drawable.ic_lock_lock', 'android.R.drawable.ic_menu_camera')
-            
-            # حقن الكود الجديد قبل القوس الأخير للملف
-            last_brace_index = main_code.rfind('}')
-            if last_brace_index != -1:
-                updated_code = main_code[:last_brace_index] + '\n\n' + patch_code + '\n}'
-                with open(target_file, 'w', encoding='utf-8') as f:
-                    f.write(updated_code)
-                print('✅ تم حقن التحديثات بنجاح داخل MainActivity.kt')
-        else:
-            print('ℹ️ لا يوجد ملف patch.txt، سيتم البناء كالمعتاد.')
+                code = f.read()
+
+            # 1. إصلاح اللوجو واستبداله بالدالة البرمجية المباشرة
+            if 'setImageResource(android.R.drawable.ic_lock_lock)' in code:
+                code = code.replace(
+                    'setImageResource(android.R.drawable.ic_lock_lock)',
+                    'setImageBitmap(createCustomLogoBitmap())'
+                )
+
+            # 2. إضافة زر الفيديو إلى الواجهة تلقائياً
+            if 'btnVideoRecord' not in code and 'btnGallery' in code:
+                code = code.replace(
+                    'val btnGallery = createStyledButton(\"📂 اختيار صورة من المعرض وتوثيقها\", \"#334155\") { openGallery() }',
+                    'val btnGallery = createStyledButton(\"📂 اختيار صورة من المعرض وتوثيقها\", \"#334155\") { openGallery() }\n        val btnVideoRecord = createStyledButton(\"🎥 تسجيل فيديو موثق (30 ثانية)\", \"#334155\") { launchVideoCamera() }'
+                )
+                code = code.replace(
+                    'rootLayout.addView(btnGallery)',
+                    'rootLayout.addView(btnGallery)\n        rootLayout.addView(btnVideoRecord)'
+                )
+
+            # 3. تحديث onActivityResult لدعم استقبال الفيديو
+            if 'requestCode == 300' not in code and 'GALLERY_REQUEST_CODE ->' in code:
+                code = code.replace(
+                    'GALLERY_REQUEST_CODE -> data?.data?.let { uri ->',
+                    '300 -> Toast.makeText(this, \"🎥 تم تسجيل الفيديو الموثق بنجاح!\", Toast.LENGTH_LONG).show()\n                GALLERY_REQUEST_CODE -> data?.data?.let { uri ->'
+                )
+
+            # 4. حقن محتوى patch.txt
+            if os.path.exists(patch_file):
+                with open(patch_file, 'r', encoding='utf-8') as f:
+                    patch_code = f.read()
+                
+                last_brace = code.rfind('}')
+                if last_brace != -1 and 'createCustomLogoBitmap' not in code:
+                    code = code[:last_brace] + '\n\n' + patch_code + '\n}'
+
+            with open(target_file, 'w', encoding='utf-8') as f:
+                f.write(code)
+            print('✅ تمت عملية الحقن والتحديث الذكي بنجاح تام!')
         "
 
-    - name: Build Gradle APK
-      run: ./gradlew assembleDebug
+    - name: Build Gradle APK (Smart Runner)
+      run: |
+        if [ -f "gradlew" ]; then
+          chmod +x gradlew
+          ./gradlew assembleDebug
+        else
+          gradle assembleDebug
+        fi
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
