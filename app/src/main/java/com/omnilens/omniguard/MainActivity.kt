@@ -79,7 +79,7 @@ class MainActivity : FragmentActivity() {
 
         // 🌟 1. شعار التطبيق المتحرك النبّاض (Pulsing Animated Logo)
         logoImageView = ImageView(this).apply {
-            setImageResource(android.R.drawable.ic_lock_lock) // يمكن استبدال الأيقونة بملف الشعار الخاص بك
+            setImageResource(android.R.drawable.ic_lock_lock)
             setColorFilter(Color.parseColor("#38BDF8"))
             layoutParams = LinearLayout.LayoutParams(140, 140).apply {
                 gravity = Gravity.CENTER
@@ -88,9 +88,9 @@ class MainActivity : FragmentActivity() {
         }
         startPulsingAnimation(logoImageView)
 
-        // 2. ترويسة الإصدار الجديد v2.1
+        // 2. ترويسة الإصدار v3.0 الرسمي
         val titleText = TextView(this).apply {
-            text = "منظومة OmniLens Engine v2.1 🛡️"
+            text = "منظومة OmniLens Engine v3.0 🛡️"
             textSize = 22f
             setTypeface(null, Typeface.BOLD)
             setTextColor(Color.WHITE)
@@ -99,7 +99,7 @@ class MainActivity : FragmentActivity() {
         }
 
         val subTitleText = TextView(this).apply {
-            text = "إصدار الحماية السيادية والبصمة الحيوية | Sovereign Shield"
+            text = "الإصدار السيادي الموحد | Sovereign Unified Edition v3.0"
             textSize = 11f
             setTextColor(Color.parseColor("#94A3B8"))
             gravity = Gravity.CENTER
@@ -112,7 +112,7 @@ class MainActivity : FragmentActivity() {
         }
         updateAppLockBtnState()
 
-        // 4. وسائل التقاط الوسائط
+        // 4. وسائل التقاط الوسائط المباشرة
         val captureHeader = createSectionHeader("📷 وسائل التقاط وجلب الوسائط")
         val btnBackCamera = createStyledButton("📷 التقاط بالكاميرا الخلفية", "#334155") { launchCamera(isFront = false) }
         val btnFrontCamera = createStyledButton("🤳 التقاط بالكاميرا الأمامية", "#334155") { launchCamera(isFront = true) }
@@ -157,7 +157,7 @@ class MainActivity : FragmentActivity() {
             setPadding(10, 5, 10, 15)
         }
 
-        // 7. الخزنة المشفرة
+        // 7. الخزنة المشفرة الخاصة
         val historyTitle = createSectionHeader("🔐 الخزنة المشفرة الخاصة (رمز سري + بصمة)")
         btnToggleVault = createStyledButton("🔒 فتح الخزنة المشفرة (PIN Code)", "#DC2626") { handleVaultSecurityAccess() }
         historyLayout = LinearLayout(this).apply {
@@ -173,7 +173,7 @@ class MainActivity : FragmentActivity() {
             setPadding(0, 25, 0, 10)
         }
 
-        // تجميع عناصر الواجهة
+        // تجميع العناصر في الواجهة الرئيسية
         rootLayout.addView(logoImageView)
         rootLayout.addView(titleText)
         rootLayout.addView(subTitleText)
@@ -202,7 +202,6 @@ class MainActivity : FragmentActivity() {
         verifyAppAccessOnLaunch()
     }
 
-    // 🌟 تحريك الشعار النبّاض (Pulsing Animation)
     private fun startPulsingAnimation(targetView: View) {
         val scaleX = ObjectAnimator.ofFloat(targetView, "scaleX", 1.0f, 1.2f)
         val scaleY = ObjectAnimator.ofFloat(targetView, "scaleY", 1.0f, 1.2f)
@@ -222,14 +221,13 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    // 🔑 التحقق من قفل التطبيق عند الفتح حسب اختيار المستخدم وربطه بقفل الشاشة
     private fun verifyAppAccessOnLaunch() {
         val isLockEnabled = sharedPrefs.getBoolean("app_lock_enabled", false)
         if (isLockEnabled && !isAppLocked) {
             val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
             if (keyguardManager.isKeyguardSecure) {
                 val intent = keyguardManager.createConfirmDeviceCredentialIntent(
-                    "منظومة OmniLens 🛡️",
+                    "منظومة OmniLens v3.0 🛡️",
                     "يرجى تأكيد هوية المالك (بصمة الوجه / الإصبع / الرمز السري) للوصول"
                 )
                 if (intent != null) {
@@ -479,7 +477,7 @@ class MainActivity : FragmentActivity() {
                 isAppLocked = true
                 Toast.makeText(this, "تم التأكد من الهوية بنجاح ✅", Toast.LENGTH_SHORT).show()
             } else {
-                finish() // إغلاق التطبيق إذا فشل التأكد من الهوية
+                finish()
             }
             return
         }
