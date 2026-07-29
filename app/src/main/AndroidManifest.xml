@@ -1,15 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- تصاريح الكاميرا والصوت -->
+    <!-- أذونات الكاميرا والصوت -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
-    <!-- تصاريح قراءة وسائط الصور والفيديوهات (أندرويد 13 وما فوق API 33+) -->
+    <!-- أذونات الوسائط لجميع إصدارات أندرويد -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-
-    <!-- تصاريح التخزين لأجهزة أندرويد القديمة (API 32 وما دون) -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 
@@ -23,6 +21,7 @@
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
+        <!-- 1. الواجهة الرئيسية -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -32,7 +31,12 @@
             </intent-filter>
         </activity>
 
-        <!-- موفر الملفات الحصري لمشاركة الوسائط بأمان -->
+        <!-- 2. واجهة المشاركة الموثقة -->
+        <activity
+            android:name=".ui.ShareMediaActivity"
+            android:exported="false" />
+
+        <!-- 3. موفر الملفات الحصري للخزنة -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="com.omnilens.omniguard.provider"
