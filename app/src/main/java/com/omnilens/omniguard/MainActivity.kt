@@ -183,7 +183,7 @@ class MainActivity : Activity() {
             setPadding(0, 25, 0, 10)
         }
 
-        // تجميع العناصر بداخل اللوح الرئيسي
+        // تجميع العناصر
         rootLayout.addView(titleText)
         rootLayout.addView(subTitleText)
         rootLayout.addView(captureHeader)
@@ -239,10 +239,16 @@ class MainActivity : Activity() {
         }
     }
 
+    // 🎯 إصلاح فحص الأذونات الحقيقي لمنع حظر الكاميرا الممتد
     private fun checkPermissions(): Boolean {
         val needed = mutableListOf<String>()
-        needed.add(Manifest.permission.CAMERA)
-        needed.add(Manifest.permission.RECORD_AUDIO)
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            needed.add(Manifest.permission.CAMERA)
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            needed.add(Manifest.permission.RECORD_AUDIO)
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
