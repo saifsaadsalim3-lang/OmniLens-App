@@ -1,91 +1,43 @@
-name: Android CI Build Engine v3.0
+name: Build OmniLens APK
 
 on:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-        cache: gradle
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
 
-    - name: Setup Gradle Engine
-      uses: gradle/actions/setup-gradle@v3
+      - name: Generate Compatible Gradle Wrapper
+        run: gradle wrapper --gradle-version 8.4
 
-    - name: Run Smart Auto-Injector (الحقن الذكي الآلي)
-      run: |
-        python3 -c "
-        import os
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
 
-        target_file = 'app/src/main/java/com/omnilens/omniguard/MainActivity.kt'
-        patch_file = 'patch.txt'
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --no-daemon
 
-        if os.path.exists(target_file):
-            with open(target_file, 'r', encoding='utf-8') as f:
-                code = f.read()
+      - name: Prepare and Rename APK
+        run: |
+          mkdir -p output_apk
+          find app/build/outputs/apk/debug/ -name "*.apk" -exec cp {} output_apk/OmniLens-v1.9.1.apk \;
 
-            # 1. إصلاح اللوجو واستبداله بالدالة البرمجية المباشرة
-            if 'setImageResource(android.R.drawable.ic_lock_lock)' in code:
-                code = code.replace(
-                    'setImageResource(android.R.drawable.ic_lock_lock)',
-                    'setImageBitmap(createCustomLogoBitmap())'
-                )
-
-            # 2. إضافة زر الفيديو إلى الواجهة تلقائياً
-            if 'btnVideoRecord' not in code and 'btnGallery' in code:
-                code = code.replace(
-                    'val btnGallery = createStyledButton(\"📂 اختيار صورة من المعرض وتوثيقها\", \"#334155\") { openGallery() }',
-                    'val btnGallery = createStyledButton(\"📂 اختيار صورة من المعرض وتوثيقها\", \"#334155\") { openGallery() }\n        val btnVideoRecord = createStyledButton(\"🎥 تسجيل فيديو موثق (30 ثانية)\", \"#334155\") { launchVideoCamera() }'
-                )
-                code = code.replace(
-                    'rootLayout.addView(btnGallery)',
-                    'rootLayout.addView(btnGallery)\n        rootLayout.addView(btnVideoRecord)'
-                )
-
-            # 3. تحديث onActivityResult لدعم استقبال الفيديو
-            if 'requestCode == 300' not in code and 'GALLERY_REQUEST_CODE ->' in code:
-                code = code.replace(
-                    'GALLERY_REQUEST_CODE -> data?.data?.let { uri ->',
-                    '300 -> Toast.makeText(this, \"🎥 تم تسجيل الفيديو الموثق بنجاح!\", Toast.LENGTH_LONG).show()\n                GALLERY_REQUEST_CODE -> data?.data?.let { uri ->'
-                )
-
-            # 4. حقن محتوى patch.txt
-            if os.path.exists(patch_file):
-                with open(patch_file, 'r', encoding='utf-8') as f:
-                    patch_code = f.read()
-                
-                last_brace = code.rfind('}')
-                if last_brace != -1 and 'createCustomLogoBitmap' not in code:
-                    code = code[:last_brace] + '\n\n' + patch_code + '\n}'
-
-            with open(target_file, 'w', encoding='utf-8') as f:
-                f.write(code)
-            print('✅ تمت عملية الحقن والتحديث الذكي بنجاح تام!')
-        "
-
-    - name: Build Gradle APK (Smart Runner)
-      run: |
-        if [ -f "gradlew" ]; then
-          chmod +x gradlew
-          ./gradlew assembleDebug
-        else
-          gradle assembleDebug
-        fi
-
-    - name: Upload APK Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: OmniLens-v3.0.0-APK
-        path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OmniLens-v1.9.1-APK
+          path: output_apk/OmniLens-v1.9.1.apk
+          if-no-files-found: error
