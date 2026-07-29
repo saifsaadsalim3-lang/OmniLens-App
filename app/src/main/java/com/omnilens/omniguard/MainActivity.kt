@@ -48,12 +48,6 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 🛡️ حظر لقطات الشاشة وتسجيل الفيديو كلياً بداخل الخزنة والتطبيق
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_SECURE,
-            WindowManager.LayoutParams.FLAG_SECURE
-        )
-
         val scrollView = ScrollView(this).apply {
             setBackgroundColor(Color.parseColor("#0F172A"))
             isFillViewport = true
@@ -65,10 +59,13 @@ class MainActivity : Activity() {
             setPadding(40, 60, 40, 60)
         }
 
+        // شعار التطبيق الرئيسي
         val logoImage = ImageView(this).apply {
             val imageResId = resources.getIdentifier("app_icon", "drawable", packageName)
             if (imageResId != 0) setImageResource(imageResId)
-            layoutParams = LinearLayout.LayoutParams(180, 180).apply { gravity = Gravity.CENTER }
+            layoutParams = LinearLayout.LayoutParams(180, 180).apply {
+                gravity = Gravity.CENTER
+            }
         }
 
         val titleText = TextView(this).apply {
@@ -81,7 +78,7 @@ class MainActivity : Activity() {
         }
 
         statusTextView = TextView(this).apply {
-            text = "🛡️ نظام التشفير والخزنة المشفرة جاهز"
+            text = "🛡️ نظام التشفير والخزنة المشفرة جاهز ✅"
             textSize = 14f
             setTextColor(Color.parseColor("#38BDF8"))
             gravity = Gravity.CENTER
@@ -89,7 +86,7 @@ class MainActivity : Activity() {
         }
 
         settingsSummaryText = TextView(this).apply {
-            text = "⚙️ الإعدادات: [$selectedResolution] | [$selectedFPS]"
+            text = "⚙️ الإعدادات الحالية: [$selectedResolution] | [$selectedFPS]"
             textSize = 12f
             setTextColor(Color.parseColor("#F59E0B"))
             gravity = Gravity.CENTER
@@ -97,7 +94,7 @@ class MainActivity : Activity() {
         }
 
         val btnSettings = Button(this).apply {
-            text = "⚙️ ضبط دقة التصوير والإطارات"
+            text = "⚙️ ضبط دقة التصوير والإطارات (Resolution & FPS)"
             setBackgroundColor(Color.parseColor("#334155"))
             setTextColor(Color.WHITE)
             setOnClickListener { showCameraSettingsDialog() }
@@ -166,7 +163,7 @@ class MainActivity : Activity() {
         }
 
         hashTextView = TextView(this).apply {
-            text = "التقط صورة/فيديو لتشفيرها وتأمينها داخل الخزنة."
+            text = "التقط صورة/فيديو لتشفيرها، استعراضها بمشغلات جهازك، وحفظها مباشرة بالخزنة."
             textSize = 12f
             setTextColor(Color.parseColor("#94A3B8"))
             gravity = Gravity.CENTER
@@ -174,7 +171,7 @@ class MainActivity : Activity() {
         }
 
         val historyTitle = TextView(this).apply {
-            text = "📜 سجل الخزنة المشفرة (اضغط للعرض)"
+            text = "📜 سجل وسائط الخزنة المشفرة (اضغط للعرض)"
             textSize = 16f
             setTypeface(null, Typeface.BOLD)
             setTextColor(Color.parseColor("#F8FAFC"))
@@ -217,6 +214,12 @@ class MainActivity : Activity() {
         if (checkPermissions()) {
             loadSavedVaultHistory()
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // 🔓 إلغاء حظر لقطة الشاشة في الواجهة الرئيسية لإتاحة التصوير العادي
+        window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
     }
 
     private fun checkPermissions(): Boolean {
@@ -328,12 +331,14 @@ class MainActivity : Activity() {
         statusTextView.text = "✅ تم تشفير البصمة وتطبيق طبقة التوثيق"
     }
 
+    // 🖌️ رسم نمط العلامة المائية والشريط العنابي السفلي الحاوي لبيانات المالك
     private fun addOmniLensWatermarkToBitmap(srcBitmap: Bitmap): Bitmap {
         val mutableBitmap = srcBitmap.copy(Bitmap.Config.ARGB_8888, true)
         val canvas = Canvas(mutableBitmap)
         val width = canvas.width
         val height = canvas.height
 
+        // 1. رسم النص المائل الخفي (PROTECTED OMNILENS)
         val watermarkPaint = Paint().apply {
             color = Color.argb(45, 255, 255, 255)
             textSize = (width * 0.042f).coerceAtLeast(30f)
@@ -353,6 +358,7 @@ class MainActivity : Activity() {
         }
         canvas.restore()
 
+        // 2. رسم الشريط السفلي العنابي
         val barHeight = (height * 0.12f).coerceAtLeast(120f)
         val barPaint = Paint().apply {
             color = Color.parseColor("#800000")
@@ -361,6 +367,7 @@ class MainActivity : Activity() {
         val barRect = RectF(0f, height - barHeight, width.toFloat(), height.toFloat())
         canvas.drawRect(barRect, barPaint)
 
+        // 3. كتابة بيانات المالك والتاريخ بدون تشوه
         val ownerName = "SAIF SAAD SALIM"
         val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
 
@@ -456,7 +463,7 @@ class MainActivity : Activity() {
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply { setMargins(0, 0, 0, 10) }
-                setOnClickListener { openFileInViewer(file) }
+                setOnClickListener { openFileInVaultViewer(file) }
             }
 
             val iconText = TextView(this).apply {
@@ -489,7 +496,10 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun openFileInViewer(file: File) {
+    // 🛡️ فتح ملف الخزنة وتفعيل حظر الشاشة فوراً لمنع التعديل والسرقة
+    private fun openFileInVaultViewer(file: File) {
+        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+
         val uri = FileProvider.getUriForFile(this, "com.omnilens.omniguard.provider", file)
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, if (file.name.endsWith(".mp4", true)) "video/*" else "image/*")
@@ -529,7 +539,7 @@ class MainActivity : Activity() {
         builder.setPositiveButton("حفظ الإعدادات") { _, _ ->
             selectedResolution = spinnerRes.selectedItem.toString()
             selectedFPS = spinnerFPS.selectedItem.toString()
-            settingsSummaryText.text = "⚙️ الإعدادات: [$selectedResolution] | [$selectedFPS]"
+            settingsSummaryText.text = "⚙️ الإعدادات الحالية: [$selectedResolution] | [$selectedFPS]"
             Toast.makeText(this, "تم تحديث إعدادات الكاميرا", Toast.LENGTH_SHORT).show()
         }
         builder.setNegativeButton("إلغاء", null)
